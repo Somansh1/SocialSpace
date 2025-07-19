@@ -93,6 +93,20 @@ wss.on("connection", (ws) => {
       return
     }
 
+    // Handle voice translation
+    if (data.type === "voice-translation") {
+      console.log(
+        `Voice translation from ${data.senderId} to ${data.targetId}: ${data.originalText} -> ${data.translatedText}`,
+      )
+      if (clients.has(data.targetId)) {
+        const targetClient = clients.get(data.targetId)
+        if (targetClient.readyState === ws.OPEN) {
+          targetClient.send(JSON.stringify(data))
+        }
+      }
+      return
+    }
+
     // Handle chat messages
     if (data.type === "chat-message") {
       console.log(`Chat message from ${data.senderId} to ${data.targetId}: ${data.message}`)
@@ -120,11 +134,21 @@ wss.on("connection", (ws) => {
     // Handle video sync
     if (data.type === "video-sync" || data.type === "video-url") {
       console.log(`Video ${data.type} from ${data.senderId} to ${data.targetId}`)
+      if (data.type === "video-url") {
+        console.log(`Video URL: ${data.url}, Platform: ${data.platformType}`)
+      }
+
       if (clients.has(data.targetId)) {
         const targetClient = clients.get(data.targetId)
-        if (targetClient.readyState === ws.OPEN) {
+        if (targetClient.readyState === 1) {
+          // WebSocket.OPEN
           targetClient.send(JSON.stringify(data))
+          console.log(`Successfully relayed ${data.type} to ${data.targetId}`)
+        } else {
+          console.log(`Target client ${data.targetId} connection not open`)
         }
+      } else {
+        console.log(`Target client ${data.targetId} not found for video message`)
       }
       return
     }

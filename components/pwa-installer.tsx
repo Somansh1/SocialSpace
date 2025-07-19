@@ -16,15 +16,27 @@ export function PWAInstaller() {
   const [isIOS, setIsIOS] = useState(false)
 
   useEffect(() => {
-    // Check if it's iOS
+    // --- START: Added Code for Service Worker Registration ---
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker
+          .register("/sw.js")
+          .then((registration) => {
+            console.log("Service Worker registered: ", registration)
+          })
+          .catch((registrationError) => {
+            console.log("Service Worker registration failed: ", registrationError)
+          })
+      })
+    }
+    // --- END: Added Code for Service Worker Registration ---
+
     const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
     setIsIOS(iOS)
 
-    // Check if app is already installed
     const isStandalone = window.matchMedia("(display-mode: standalone)").matches
     if (isStandalone) return
 
-    // Listen for the beforeinstallprompt event
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault()
       setDeferredPrompt(e as BeforeInstallPromptEvent)
@@ -33,7 +45,6 @@ export function PWAInstaller() {
 
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
 
-    // For iOS, show install prompt after a delay
     if (iOS && !isStandalone) {
       setTimeout(() => setShowInstallPrompt(true), 3000)
     }

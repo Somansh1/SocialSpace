@@ -2,13 +2,14 @@
 
 import type React from "react"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Upload, ImageIcon, Video, LinkIcon, Eraser, Share2 } from "lucide-react"
+import { Upload, ImageIcon, Video, LinkIcon, Eraser, Share2, Minus, Plus } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useCall } from "@/components/call-provider"
+import { useWebSocket } from "@/components/websocket-provider"
 
 interface MediaInterfaceProps {
   peerId: string
@@ -23,6 +24,15 @@ interface MediaItem {
   timestamp: Date
 }
 
+interface DrawingPoint {
+  x: number
+  y: number
+  color: string
+  size: number
+  isStart: boolean
+  timestamp: number
+}
+
 export function MediaInterface({ peerId, targetId }: MediaInterfaceProps) {
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([])
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null)
@@ -30,29 +40,23 @@ export function MediaInterface({ peerId, targetId }: MediaInterfaceProps) {
   const [isDrawing, setIsDrawing] = useState(false)
   const [drawingColor, setDrawingColor] = useState("#ff0000")
   const [brushSize, setBrushSize] = useState(3)
-  const [ws, setWs] = useState<WebSocket | null>(null)
+  const [drawingPoints, setDrawingPoints] = useState<DrawingPoint[]>([])
+  const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 })
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const imageRef = useRef<HTMLImageElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const lastPointRef = useRef<{ x: number; y: number } | null>(null)
 
   const { toast } = useToast()
   const { callState } = useCall()
+  const { sendMessage, connectionState, registerMessageHandler } = useWebSocket()
 
+  // Register message handler for media messages
   useEffect(() => {
-    // Initialize WebSocket connection
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "wss://socialspace-bakend.onrender.com"
-    const websocket = new WebSocket(backendUrl)
-
-    websocket.onopen = () => {
-      websocket.send(JSON.stringify({ type: "register", id: peerId }))
-      setWs(websocket)
-    }
-
-    websocket.onmessage = (event) => {
-      const data = JSON.parse(event.data)
-
+    const unregister = registerMessageHandler((data: any) => {
       if (data.type === "media-share") {
         const newMedia: MediaItem = {
           id: Date.now().toString(),
@@ -69,14 +73,38 @@ export function MediaInterface({ peerId, targetId }: MediaInterfaceProps) {
         })
       } else if (data.type === "drawing-data") {
         // Handle real-time drawing data
-        drawOnCanvas(data.x, data.y, data.isDrawing, data.color, data.size)
+        handleRemoteDrawing(data)
+      } else if (data.type === "drawing-clear") {
+        // Handle canvas clear
+        clearCanvas()
       }
-    }
+    })
 
-    return () => {
-      websocket.close()
+    return unregister
+  }, [registerMessageHandler])
+
+  const handleRemoteDrawing = useCallback((data: any) => {
+    const canvas = canvasRef.current
+    const ctx = canvas?.getContext("2d")
+    if (!ctx || !canvas) return
+
+    // Convert relative coordinates to canvas coordinates
+    const x = data.x * canvas.width
+    const y = data.y * canvas.height
+
+    ctx.strokeStyle = data.color
+    ctx.lineWidth = data.size
+    ctx.lineCap = "round"
+    ctx.lineJoin = "round"
+
+    if (data.isStart) {
+      ctx.beginPath()
+      ctx.moveTo(x, y)
+    } else {
+      ctx.lineTo(x, y)
+      ctx.stroke()
     }
-  }, [peerId])
+  }, [])
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files
@@ -126,22 +154,19 @@ export function MediaInterface({ peerId, targetId }: MediaInterfaceProps) {
   }
 
   const shareMedia = (media: MediaItem) => {
-    if (ws) {
-      ws.send(
-        JSON.stringify({
-          type: "media-share",
-          mediaType: media.type,
-          url: media.url,
-          name: media.name,
-          targetId,
-          senderId: peerId,
-        }),
-      )
-    }
+    sendMessage({
+      type: "media-share",
+      mediaType: media.type,
+      url: media.url,
+      name: media.name,
+      targetId,
+      senderId: peerId,
+    })
   }
 
   const selectMedia = (media: MediaItem) => {
     setSelectedMedia(media)
+    setDrawingPoints([])
     // Initialize canvas for drawing if it's an image
     if (media.type === "image") {
       setTimeout(() => {
@@ -153,47 +178,118 @@ export function MediaInterface({ peerId, targetId }: MediaInterfaceProps) {
   const initializeCanvas = () => {
     const canvas = canvasRef.current
     const image = imageRef.current
+    const container = containerRef.current
 
-    if (!canvas || !image) return
+    if (!canvas || !image || !container) return
 
-    const ctx = canvas.getContext("2d")
-    if (!ctx) return
+    // Wait for image to load
+    const setupCanvas = () => {
+      const containerRect = container.getBoundingClientRect()
+      const imageRect = image.getBoundingClientRect()
 
-    // Set canvas size to match image
-    canvas.width = image.naturalWidth
-    canvas.height = image.naturalHeight
+      // Set canvas size to match displayed image size
+      canvas.width = imageRect.width
+      canvas.height = imageRect.height
 
-    // Clear canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
+      setCanvasSize({ width: imageRect.width, height: imageRect.height })
+
+      // Position canvas over image
+      canvas.style.position = "absolute"
+      canvas.style.left = "0"
+      canvas.style.top = "0"
+      canvas.style.width = `${imageRect.width}px`
+      canvas.style.height = `${imageRect.height}px`
+
+      // Clear canvas
+      const ctx = canvas.getContext("2d")
+      if (ctx) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height)
+        // Set up drawing context
+        ctx.lineCap = "round"
+        ctx.lineJoin = "round"
+      }
+    }
+
+    if (image.complete) {
+      setupCanvas()
+    } else {
+      image.onload = setupCanvas
+    }
   }
 
-  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const getCanvasCoordinates = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current
+    if (!canvas) return null
+
+    const rect = canvas.getBoundingClientRect()
+    let clientX: number, clientY: number
+
+    if ("touches" in e) {
+      // Touch event
+      if (e.touches.length === 0) return null
+      clientX = e.touches[0].clientX
+      clientY = e.touches[0].clientY
+    } else {
+      // Mouse event
+      clientX = e.clientX
+      clientY = e.clientY
+    }
+
+    const x = clientX - rect.left
+    const y = clientY - rect.top
+
+    // Convert to canvas coordinates
+    const canvasX = (x / rect.width) * canvas.width
+    const canvasY = (y / rect.height) * canvas.height
+
+    return { x: canvasX, y: canvasY, relativeX: x / rect.width, relativeY: y / rect.height }
+  }
+
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault()
+    const coords = getCanvasCoordinates(e)
+    if (!coords) return
+
     setIsDrawing(true)
-    const rect = canvasRef.current?.getBoundingClientRect()
-    if (!rect) return
+    lastPointRef.current = { x: coords.x, y: coords.y }
 
-    const x = (e.clientX - rect.left) * (canvasRef.current!.width / rect.width)
-    const y = (e.clientY - rect.top) * (canvasRef.current!.height / rect.height)
-
-    drawOnCanvas(x, y, true, drawingColor, brushSize)
-    sendDrawingData(x, y, true)
+    drawOnCanvas(coords.x, coords.y, true, drawingColor, brushSize)
+    sendDrawingData(coords.relativeX, coords.relativeY, true)
   }
 
-  const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     if (!isDrawing) return
+    e.preventDefault()
 
-    const rect = canvasRef.current?.getBoundingClientRect()
-    if (!rect) return
+    const coords = getCanvasCoordinates(e)
+    if (!coords || !lastPointRef.current) return
 
-    const x = (e.clientX - rect.left) * (canvasRef.current!.width / rect.width)
-    const y = (e.clientY - rect.top) * (canvasRef.current!.height / rect.height)
+    // Smooth line drawing
+    drawSmoothLine(lastPointRef.current.x, lastPointRef.current.y, coords.x, coords.y)
+    sendDrawingData(coords.relativeX, coords.relativeY, false)
 
-    drawOnCanvas(x, y, false, drawingColor, brushSize)
-    sendDrawingData(x, y, false)
+    lastPointRef.current = { x: coords.x, y: coords.y }
   }
 
   const stopDrawing = () => {
     setIsDrawing(false)
+    lastPointRef.current = null
+  }
+
+  const drawSmoothLine = (x1: number, y1: number, x2: number, y2: number) => {
+    const canvas = canvasRef.current
+    const ctx = canvas?.getContext("2d")
+    if (!ctx) return
+
+    ctx.strokeStyle = drawingColor
+    ctx.lineWidth = brushSize
+    ctx.lineCap = "round"
+    ctx.lineJoin = "round"
+
+    ctx.beginPath()
+    ctx.moveTo(x1, y1)
+    ctx.lineTo(x2, y2)
+    ctx.stroke()
   }
 
   const drawOnCanvas = (x: number, y: number, isStart: boolean, color: string, size: number) => {
@@ -204,32 +300,33 @@ export function MediaInterface({ peerId, targetId }: MediaInterfaceProps) {
     ctx.strokeStyle = color
     ctx.lineWidth = size
     ctx.lineCap = "round"
+    ctx.lineJoin = "round"
 
     if (isStart) {
       ctx.beginPath()
       ctx.moveTo(x, y)
-    } else {
-      ctx.lineTo(x, y)
+      // Draw a small dot for single clicks
+      ctx.lineTo(x + 0.1, y + 0.1)
       ctx.stroke()
     }
   }
 
-  const sendDrawingData = (x: number, y: number, isStart: boolean) => {
-    if (ws) {
-      ws.send(
-        JSON.stringify({
-          type: "drawing-data",
-          x,
-          y,
-          isDrawing: !isStart,
-          color: drawingColor,
-          size: brushSize,
-          targetId,
-          senderId: peerId,
-        }),
-      )
-    }
-  }
+  const sendDrawingData = useCallback(
+    (relativeX: number, relativeY: number, isStart: boolean) => {
+      sendMessage({
+        type: "drawing-data",
+        x: relativeX,
+        y: relativeY,
+        isStart,
+        color: drawingColor,
+        size: brushSize,
+        targetId,
+        senderId: peerId,
+        timestamp: Date.now(),
+      })
+    },
+    [sendMessage, drawingColor, brushSize, targetId, peerId],
+  )
 
   const clearCanvas = () => {
     const canvas = canvasRef.current
@@ -237,9 +334,30 @@ export function MediaInterface({ peerId, targetId }: MediaInterfaceProps) {
     if (!ctx) return
 
     ctx.clearRect(0, 0, canvas.width, canvas.height)
+    setDrawingPoints([])
+
+    // Send clear command to peer
+    sendMessage({
+      type: "drawing-clear",
+      targetId,
+      senderId: peerId,
+    })
   }
 
-  const colors = ["#ff0000", "#00ff00", "#0000ff", "#ffff00", "#ff00ff", "#00ffff", "#000000", "#ffffff"]
+  const colors = [
+    "#ff0000",
+    "#00ff00",
+    "#0000ff",
+    "#ffff00",
+    "#ff00ff",
+    "#00ffff",
+    "#000000",
+    "#ffffff",
+    "#ff8800",
+    "#8800ff",
+    "#00ff88",
+    "#ff0088",
+  ]
 
   return (
     <>
@@ -319,29 +437,50 @@ export function MediaInterface({ peerId, targetId }: MediaInterfaceProps) {
               <span>Media Viewer</span>
               {selectedMedia?.type === "image" && (
                 <div className="flex items-center gap-2">
-                  <Button onClick={clearCanvas} size="sm" variant="outline">
+                  <Button
+                    onClick={clearCanvas}
+                    size="sm"
+                    variant="outline"
+                    className="flex items-center gap-1 bg-transparent"
+                  >
                     <Eraser className="w-4 h-4" />
+                    Clear
                   </Button>
+
+                  {/* Brush Size */}
+                  <div className="flex items-center gap-1">
+                    <Button
+                      onClick={() => setBrushSize(Math.max(1, brushSize - 1))}
+                      size="sm"
+                      variant="outline"
+                      className="h-8 w-8 p-0"
+                    >
+                      <Minus className="w-3 h-3" />
+                    </Button>
+                    <span className="text-xs text-gray-400 min-w-[2rem] text-center">{brushSize}px</span>
+                    <Button
+                      onClick={() => setBrushSize(Math.min(20, brushSize + 1))}
+                      size="sm"
+                      variant="outline"
+                      className="h-8 w-8 p-0"
+                    >
+                      <Plus className="w-3 h-3" />
+                    </Button>
+                  </div>
+
+                  {/* Color Palette */}
                   <div className="flex gap-1">
                     {colors.map((color) => (
                       <button
                         key={color}
                         onClick={() => setDrawingColor(color)}
-                        className={`w-6 h-6 rounded-full border-2 ${
-                          drawingColor === color ? "border-white" : "border-gray-600"
+                        className={`w-6 h-6 rounded-full border-2 transition-all ${
+                          drawingColor === color ? "border-white scale-110" : "border-gray-600 hover:border-gray-400"
                         }`}
                         style={{ backgroundColor: color }}
                       />
                     ))}
                   </div>
-                  <Input
-                    type="range"
-                    min="1"
-                    max="10"
-                    value={brushSize}
-                    onChange={(e) => setBrushSize(Number(e.target.value))}
-                    className="w-20"
-                  />
                 </div>
               )}
             </CardTitle>
@@ -350,28 +489,30 @@ export function MediaInterface({ peerId, targetId }: MediaInterfaceProps) {
             {!selectedMedia ? (
               <div className="flex items-center justify-center h-96 text-gray-400">Select a media item to view</div>
             ) : (
-              <div className="relative">
+              <div ref={containerRef} className="relative">
                 {selectedMedia.type === "image" && (
-                  <div className="relative">
+                  <div className="relative inline-block">
                     <img
                       ref={imageRef}
                       src={selectedMedia.url || "/placeholder.svg"}
                       alt={selectedMedia.name}
                       className="max-w-full h-auto rounded-lg"
                       onLoad={initializeCanvas}
+                      style={{ display: "block" }}
                     />
                     <canvas
                       ref={canvasRef}
-                      className="absolute top-0 left-0 cursor-crosshair"
-                      style={{
-                        width: "100%",
-                        height: "auto",
-                        maxWidth: "100%",
-                      }}
+                      className="absolute top-0 left-0 cursor-crosshair touch-none"
                       onMouseDown={startDrawing}
                       onMouseMove={draw}
                       onMouseUp={stopDrawing}
                       onMouseLeave={stopDrawing}
+                      onTouchStart={startDrawing}
+                      onTouchMove={draw}
+                      onTouchEnd={stopDrawing}
+                      style={{
+                        pointerEvents: "auto",
+                      }}
                     />
                   </div>
                 )}

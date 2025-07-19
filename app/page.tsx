@@ -9,7 +9,7 @@ import { MessageCircle, Upload, Video, Users, Edit } from "lucide-react"
 import { WebSocketProvider } from "@/components/websocket-provider"
 import { CallProvider } from "@/components/call-provider"
 import { FloatingVideoInterface } from "@/components/floating-video-interface"
-import { ChatInterface } from "@/components/chat-interface"
+import { FloatingChatInterface } from "@/components/floating-chat-interface"
 import { MediaInterface } from "@/components/media-interface"
 import { StreamingInterface } from "@/components/streaming-interface"
 import { useToast } from "@/hooks/use-toast"
@@ -19,8 +19,9 @@ export default function Home() {
   const [customPeerId, setCustomPeerId] = useState("")
   const [targetId, setTargetId] = useState("")
   const [isConnected, setIsConnected] = useState(false)
-  const [activeTab, setActiveTab] = useState("chat")
+  const [activeTab, setActiveTab] = useState("media")
   const [connectionStatus, setConnectionStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected")
+  const [isChatVisible, setIsChatVisible] = useState(false)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -75,6 +76,7 @@ export default function Home() {
   const handleDisconnect = () => {
     setIsConnected(false)
     setConnectionStatus("disconnected")
+    setIsChatVisible(false)
     toast({
       title: "Disconnected",
       description: "Connection closed",
@@ -95,6 +97,10 @@ export default function Home() {
       title: "ID Updated",
       description: `Your ID is now: ${customPeerId}`,
     })
+  }
+
+  const toggleChat = () => {
+    setIsChatVisible(!isChatVisible)
   }
 
   if (!isConnected) {
@@ -151,6 +157,14 @@ export default function Home() {
           {/* Floating Video Interface - Always Visible */}
           <FloatingVideoInterface />
 
+          {/* Floating Chat Interface */}
+          <FloatingChatInterface
+            peerId={peerId}
+            targetId={targetId}
+            isVisible={isChatVisible}
+            onClose={() => setIsChatVisible(false)}
+          />
+
           <div className="container mx-auto p-4 max-w-6xl">
             <div className="flex justify-between items-center mb-6">
               <h1 className="text-2xl font-bold">SocialSpace</h1>
@@ -159,6 +173,10 @@ export default function Home() {
                   <div>You: {peerId}</div>
                   <div>Friend: {targetId}</div>
                 </div>
+                <Button onClick={toggleChat} variant={isChatVisible ? "default" : "outline"} size="sm" className="mr-2">
+                  <MessageCircle className="w-4 h-4 mr-2" />
+                  Chat
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
@@ -171,11 +189,7 @@ export default function Home() {
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-3 bg-gray-900">
-                <TabsTrigger value="chat" className="flex items-center gap-2">
-                  <MessageCircle className="w-4 h-4" />
-                  Chat
-                </TabsTrigger>
+              <TabsList className="grid w-full grid-cols-2 bg-gray-900">
                 <TabsTrigger value="media" className="flex items-center gap-2">
                   <Upload className="w-4 h-4" />
                   Media
@@ -185,10 +199,6 @@ export default function Home() {
                   Watch
                 </TabsTrigger>
               </TabsList>
-
-              <TabsContent value="chat" className="mt-6">
-                <ChatInterface peerId={peerId} targetId={targetId} />
-              </TabsContent>
 
               <TabsContent value="media" className="mt-6">
                 <MediaInterface peerId={peerId} targetId={targetId} />

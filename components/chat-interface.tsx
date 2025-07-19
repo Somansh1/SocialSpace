@@ -6,7 +6,8 @@ import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { MessageCircle, Send, Volume2, VolumeX } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { MessageCircle, Send, Volume2, VolumeX, Languages } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useCall } from "@/components/call-provider"
 import { useWebSocket } from "@/components/websocket-provider"
@@ -17,6 +18,7 @@ interface Message {
   sender: string
   timestamp: Date
   isOwn: boolean
+  isTranscribed?: boolean
 }
 
 interface ChatInterfaceProps {
@@ -28,11 +30,23 @@ export function ChatInterface({ peerId, targetId }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [inputMessage, setInputMessage] = useState("")
   const [isTTSEnabled, setIsTTSEnabled] = useState(true)
+  const [translationLanguage, setTranslationLanguage] = useState("zh") // Default to Chinese
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const synthRef = useRef<SpeechSynthesis | null>(null)
   const { toast } = useToast()
   const { callState } = useCall()
   const { sendMessage, connectionState, registerMessageHandler } = useWebSocket()
+
+  const languages = [
+    { code: "zh", name: "Chinese" },
+    { code: "hi", name: "Hindi" },
+    { code: "es", name: "Spanish" },
+    { code: "fr", name: "French" },
+    { code: "de", name: "German" },
+    { code: "ja", name: "Japanese" },
+    { code: "ko", name: "Korean" },
+    { code: "ar", name: "Arabic" },
+  ]
 
   useEffect(() => {
     // Initialize speech synthesis
@@ -50,12 +64,13 @@ export function ChatInterface({ peerId, targetId }: ChatInterfaceProps) {
           sender: data.senderId,
           timestamp: new Date(),
           isOwn: false,
+          isTranscribed: data.message.includes("🎤 [Transcribed]"),
         }
 
         setMessages((prev) => [...prev, newMessage])
 
-        // Text-to-speech for incoming messages
-        if (isTTSEnabled && synthRef.current) {
+        // Text-to-speech for incoming messages (but not transcribed ones)
+        if (isTTSEnabled && synthRef.current && !newMessage.isTranscribed) {
           const utterance = new SpeechSynthesisUtterance(data.message)
           utterance.rate = 0.9
           utterance.volume = 0.8
@@ -109,6 +124,106 @@ export function ChatInterface({ peerId, targetId }: ChatInterfaceProps) {
     setInputMessage("")
   }
 
+  const translateMessage = async (message: Message) => {
+    try {
+      const translatedText = await mockTranslate(message.text, translationLanguage)
+
+      // Add translated message to chat
+      const translatedMessage: Message = {
+        id: Date.now().toString() + Math.random(),
+        text: `🌐 [Translated to ${languages.find((l) => l.code === translationLanguage)?.name}]: ${translatedText}`,
+        sender: peerId,
+        timestamp: new Date(),
+        isOwn: true,
+      }
+
+      setMessages((prev) => [...prev, translatedMessage])
+
+      toast({
+        title: "Translation Complete",
+        description: `Translated to ${languages.find((l) => l.code === translationLanguage)?.name}`,
+      })
+    } catch (error) {
+      toast({
+        title: "Translation Error",
+        description: "Failed to translate message",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const mockTranslate = async (text: string, targetLang: string): Promise<string> => {
+    // Remove transcription prefix if present
+    const cleanText = text.replace(/🎤 \[Transcribed\]: /, "")
+
+    // Simple mock translation - in production, use a real translation service
+    const translations: Record<string, Record<string, string>> = {
+      hello: {
+        zh: "你好",
+        hi: "नमस्ते",
+        es: "hola",
+        fr: "bonjour",
+        de: "hallo",
+        ja: "こんにちは",
+        ko: "안녕하세요",
+        ar: "مرحبا",
+      },
+      goodbye: {
+        zh: "再见",
+        hi: "अलविदा",
+        es: "adiós",
+        fr: "au revoir",
+        de: "auf wiedersehen",
+        ja: "さようなら",
+        ko: "안녕히 가세요",
+        ar: "وداعا",
+      },
+      "thank you": {
+        zh: "谢谢",
+        hi: "धन्यवाद",
+        es: "gracias",
+        fr: "merci",
+        de: "danke",
+        ja: "ありがとう",
+        ko: "감사합니다",
+        ar: "شكرا",
+      },
+      yes: { zh: "是", hi: "हाँ", es: "sí", fr: "oui", de: "ja", ja: "はい", ko: "네", ar: "نعم" },
+      no: { zh: "不", hi: "नहीं", es: "no", fr: "non", de: "nein", ja: "いいえ", ko: "아니요", ar: "لا" },
+      "how are you": {
+        zh: "你好吗",
+        hi: "आप कैसे हैं",
+        es: "¿cómo estás?",
+        fr: "comment allez-vous",
+        de: "wie geht es dir",
+        ja: "元気ですか",
+        ko: "어떻게 지내세요",
+        ar: "كيف حالك",
+      },
+    }
+
+    const lowerText = cleanText.toLowerCase()
+    for (const [english, translationMap] of Object.entries(translations)) {
+      if (lowerText.includes(english)) {
+        return translationMap[targetLang] || cleanText
+      }
+    }
+
+    // For demo purposes, add a language prefix
+    const prefixes: Record<string, string> = {
+      zh: "[中文] ",
+      hi: "[हिंदी] ",
+      es: "[ES] ",
+      fr: "[FR] ",
+      de: "[DE] ",
+      ja: "[日本語] ",
+      ko: "[한국어] ",
+      ar: "[العربية] ",
+    }
+
+    return (prefixes[targetLang] || "[TRANSLATED] ") + cleanText
+  }
+
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
@@ -148,6 +263,18 @@ export function ChatInterface({ peerId, targetId }: ChatInterfaceProps) {
               <div className="text-xs text-gray-400">
                 {connectionState === "connected" ? "🟢 Connected" : "🔴 Disconnected"}
               </div>
+              <Select value={translationLanguage} onValueChange={setTranslationLanguage}>
+                <SelectTrigger className="w-24 h-8 text-xs bg-gray-800 border-gray-600">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {languages.map((lang) => (
+                    <SelectItem key={lang.code} value={lang.code} className="text-xs">
+                      {lang.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Button onClick={toggleTTS} variant={isTTSEnabled ? "default" : "secondary"} size="sm">
                 {isTTSEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
               </Button>
@@ -165,10 +292,25 @@ export function ChatInterface({ peerId, targetId }: ChatInterfaceProps) {
                   <div
                     className={`max-w-[70%] rounded-lg p-3 ${
                       message.isOwn ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-100"
-                    }`}
+                    } ${message.isTranscribed ? "border-l-4 border-green-500" : ""}`}
                   >
                     <p className="text-sm">{message.text}</p>
-                    <p className="text-xs opacity-70 mt-1">{formatTime(message.timestamp)}</p>
+                    <div className="flex items-center justify-between mt-1">
+                      <p className="text-xs opacity-70">{formatTime(message.timestamp)}</p>
+                      {!message.isOwn &&
+                        !message.text.includes("[Translated") &&
+                        !message.text.includes("🎤 [Transcribed]") &&
+                        !message.text.includes("🌐 [Translated") && (
+                          <Button
+                            onClick={() => translateMessage(message)}
+                            size="sm"
+                            variant="ghost"
+                            className="h-5 px-1 text-xs opacity-90 hover:opacity-100 hover:bg-gray-600"
+                          >
+                            <Languages className="w-3 h-3" />
+                          </Button>
+                        )}
+                    </div>
                   </div>
                 </div>
               ))

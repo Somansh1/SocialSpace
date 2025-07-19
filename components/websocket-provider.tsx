@@ -43,7 +43,7 @@ export function WebSocketProvider({ children, peerId }: WebSocketProviderProps) 
     const websocket = new WebSocket(backendUrl)
 
     websocket.onopen = () => {
-      console.log("WebSocket connected")
+      console.log("WebSocket connected, registering with ID:", peerId)
       websocket.send(JSON.stringify({ type: "register", id: peerId }))
       setWs(websocket)
       setConnectionState("connected")
@@ -53,16 +53,15 @@ export function WebSocketProvider({ children, peerId }: WebSocketProviderProps) 
         clearTimeout(reconnectTimeoutRef.current)
       }
 
-      toast({
-        title: "Connected",
-        description: "Connected to server",
-      })
+      console.log("WebSocket connection established successfully")
     }
 
     websocket.onmessage = (event) => {
-      console.log("WebSocket received message:", event.data)
+      console.log("WebSocket received raw message:", event.data)
       try {
         const data = JSON.parse(event.data)
+        console.log("WebSocket parsed message:", data.type, data)
+
         // Notify all registered handlers
         messageHandlersRef.current.forEach((handler) => {
           try {
@@ -76,8 +75,8 @@ export function WebSocketProvider({ children, peerId }: WebSocketProviderProps) 
       }
     }
 
-    websocket.onclose = () => {
-      console.log("WebSocket disconnected")
+    websocket.onclose = (event) => {
+      console.log("WebSocket disconnected, code:", event.code, "reason:", event.reason)
       setConnectionState("disconnected")
       setWs(null)
 
@@ -95,13 +94,17 @@ export function WebSocketProvider({ children, peerId }: WebSocketProviderProps) 
   }
 
   useEffect(() => {
-    connect()
+    if (peerId) {
+      console.log("Starting WebSocket connection for peer:", peerId)
+      connect()
+    }
 
     return () => {
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current)
       }
       if (ws) {
+        console.log("Closing WebSocket connection")
         ws.close()
       }
     }
@@ -109,8 +112,9 @@ export function WebSocketProvider({ children, peerId }: WebSocketProviderProps) 
 
   const sendMessage = (message: any) => {
     if (ws?.readyState === WebSocket.OPEN) {
-      console.log("Sending message:", message)
-      ws.send(JSON.stringify(message))
+      const messageStr = JSON.stringify(message)
+      console.log("Sending WebSocket message:", message.type, message)
+      ws.send(messageStr)
     } else {
       console.warn("WebSocket not connected, message not sent:", message)
       toast({
@@ -122,8 +126,10 @@ export function WebSocketProvider({ children, peerId }: WebSocketProviderProps) 
   }
 
   const registerMessageHandler = (handler: (data: any) => void) => {
+    console.log("Registering message handler, total handlers:", messageHandlersRef.current.size + 1)
     messageHandlersRef.current.add(handler)
     return () => {
+      console.log("Unregistering message handler, remaining handlers:", messageHandlersRef.current.size - 1)
       messageHandlersRef.current.delete(handler)
     }
   }
