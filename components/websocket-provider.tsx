@@ -9,6 +9,8 @@ interface WebSocketContextType {
   connectionState: "disconnected" | "connecting" | "connected"
   sendMessage: (message: any) => void
   registerMessageHandler: (handler: (data: any) => void) => () => void
+  /** Drop the current socket (if any) and try again right now. */
+  reconnect: () => void
 }
 
 const WebSocketContext = createContext<WebSocketContextType | undefined>(undefined)
@@ -28,19 +30,23 @@ interface WebSocketProviderProps {
 
 export function WebSocketProvider({ children, peerId }: WebSocketProviderProps) {
   const [ws, setWs] = useState<WebSocket | null>(null)
-  const [connectionState, setConnectionState] = useState<"disconnected" | "connecting" | "connected">("disconnected")
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout>()
+  const [connectionState, setConnectionState] = useState<"disconnected" | "connecting" | "connected">("connecting")
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined)
+  const socketRef = useRef<WebSocket | null>(null)
+  const closedByUsRef = useRef(false)
   const messageHandlersRef = useRef<Set<(data: any) => void>>(new Set())
   const { toast } = useToast()
 
   const connect = () => {
-    if (ws?.readyState === WebSocket.OPEN) return
+    if (socketRef.current?.readyState === WebSocket.OPEN) return
+    closedByUsRef.current = false
 
     setConnectionState("connecting")
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "wss://socialspace-bakend.onrender.com"
     console.log("WebSocket connecting to:", backendUrl)
 
     const websocket = new WebSocket(backendUrl)
+    socketRef.current = websocket
 
     websocket.onopen = () => {
       console.log("WebSocket connected, registering with ID:", peerId)
@@ -77,8 +83,10 @@ export function WebSocketProvider({ children, peerId }: WebSocketProviderProps) 
 
     websocket.onclose = (event) => {
       console.log("WebSocket disconnected, code:", event.code, "reason:", event.reason)
+      if (socketRef.current !== websocket) return // a newer socket replaced this one
       setConnectionState("disconnected")
       setWs(null)
+      if (closedByUsRef.current) return
 
       // Auto-reconnect after 3 seconds
       reconnectTimeoutRef.current = setTimeout(() => {
@@ -103,10 +111,10 @@ export function WebSocketProvider({ children, peerId }: WebSocketProviderProps) 
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current)
       }
-      if (ws) {
-        console.log("Closing WebSocket connection")
-        ws.close()
-      }
+      // Close the real socket (the old code closed a stale null), so leaving the room really leaves.
+      closedByUsRef.current = true
+      socketRef.current?.close()
+      socketRef.current = null
     }
   }, [peerId])
 
@@ -125,6 +133,14 @@ export function WebSocketProvider({ children, peerId }: WebSocketProviderProps) 
     }
   }
 
+  const reconnect = () => {
+    if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current)
+    const old = socketRef.current
+    socketRef.current = null
+    old?.close()
+    connect()
+  }
+
   const registerMessageHandler = (handler: (data: any) => void) => {
     console.log("Registering message handler, total handlers:", messageHandlersRef.current.size + 1)
     messageHandlersRef.current.add(handler)
@@ -139,6 +155,7 @@ export function WebSocketProvider({ children, peerId }: WebSocketProviderProps) 
     connectionState,
     sendMessage,
     registerMessageHandler,
+    reconnect,
   }
 
   return <WebSocketContext.Provider value={value}>{children}</WebSocketContext.Provider>

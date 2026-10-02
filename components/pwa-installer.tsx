@@ -1,8 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { Download, X } from "lucide-react"
 
 interface BeforeInstallPromptEvent extends Event {
@@ -16,20 +14,11 @@ export function PWAInstaller() {
   const [isIOS, setIsIOS] = useState(false)
 
   useEffect(() => {
-    // --- START: Added Code for Service Worker Registration ---
     if ("serviceWorker" in navigator) {
-      window.addEventListener("load", () => {
-        navigator.serviceWorker
-          .register("/sw.js")
-          .then((registration) => {
-            console.log("Service Worker registered: ", registration)
-          })
-          .catch((registrationError) => {
-            console.log("Service Worker registration failed: ", registrationError)
-          })
-      })
+      const register = () => navigator.serviceWorker.register("/sw.js").catch((err) => console.warn("Service worker not registered:", err))
+      if (document.readyState === "complete") register()
+      else window.addEventListener("load", register, { once: true })
     }
-    // --- END: Added Code for Service Worker Registration ---
 
     const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
     setIsIOS(iOS)
@@ -73,30 +62,28 @@ export function PWAInstaller() {
   if (!showInstallPrompt) return null
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 z-50 md:left-auto md:right-4 md:w-80">
-      <Card className="bg-blue-600 border-blue-500 text-white">
-        <CardContent className="p-4">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <h3 className="font-semibold mb-1">Install SocialSpace</h3>
-              {isIOS ? (
-                <p className="text-sm text-blue-100 mb-3">Tap the share button and select "Add to Home Screen"</p>
-              ) : (
-                <p className="text-sm text-blue-100 mb-3">Install the app for a better experience</p>
-              )}
-              {!isIOS && (
-                <Button onClick={handleInstallClick} size="sm" className="bg-white text-blue-600 hover:bg-blue-50">
-                  <Download className="w-4 h-4 mr-2" />
-                  Install
-                </Button>
-              )}
-            </div>
-            <Button onClick={handleDismiss} size="sm" variant="ghost" className="text-white hover:bg-blue-700 p-1">
-              <X className="w-4 h-4" />
-            </Button>
+    <div className="fixed bottom-24 left-4 right-4 z-50 md:bottom-4 md:left-auto md:right-4 md:w-80" role="region" aria-label="Install SocialSpace">
+      <div className="kt-panel p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1">
+            <h3 className="mb-1 font-display text-lg font-semibold">Keep a seat saved</h3>
+            {isIOS ? (
+              <p className="mb-1 text-sm text-mute">Tap Share, then Add to Home Screen.</p>
+            ) : (
+              <p className="mb-3 text-sm text-mute">Install SocialSpace so it opens like any other app.</p>
+            )}
+            {!isIOS && (
+              <button onClick={handleInstallClick} className="kt-btn kt-btn-primary kt-btn-sm">
+                <Download className="h-4 w-4" aria-hidden />
+                Install
+              </button>
+            )}
           </div>
-        </CardContent>
-      </Card>
+          <button onClick={handleDismiss} className="kt-btn kt-btn-sm min-w-[44px] px-2" aria-label="Dismiss install prompt">
+            <X className="h-4 w-4" aria-hidden />
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

@@ -2,7 +2,6 @@
 
 import type React from "react"
 import { createContext, useContext, useState, useEffect, useRef } from "react"
-import { useToast } from "@/hooks/use-toast"
 import { useWebSocket } from "@/components/websocket-provider"
 import { SpeechRecognitionService } from "@/lib/speech-recognition"
 import { FreeTranslationService, getOfflineTranslation } from "@/lib/translation"
@@ -35,6 +34,10 @@ interface CallContextType {
   localStream: MediaStream | null
   remoteStream: MediaStream | null
 
+  // Something worth saying in place (call failed, declined, no camera...). Shown by the call panel.
+  callNotice: string | null
+  clearCallNotice: () => void
+
   // Connection
   connectionState: "disconnected" | "connecting" | "connected"
 
@@ -50,8 +53,8 @@ interface CallContextType {
   setTranscriptionLanguage: (lang: string) => void
 
   // Refs for video elements
-  localVideoRef: React.RefObject<HTMLVideoElement>
-  remoteVideoRef: React.RefObject<HTMLVideoElement>
+  localVideoRef: React.RefObject<HTMLVideoElement | null>
+  remoteVideoRef: React.RefObject<HTMLVideoElement | null>
 }
 
 const CallContext = createContext<CallContextType | undefined>(undefined)
@@ -85,6 +88,7 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null)
   const [iceCandidatesQueue, setIceCandidatesQueue] = useState<RTCIceCandidateInit[]>([])
   const [isInitiator, setIsInitiator] = useState(false)
+  const [callNotice, setCallNotice] = useState<string | null>(null)
 
   const localVideoRef = useRef<HTMLVideoElement>(null)
   const remoteVideoRef = useRef<HTMLVideoElement>(null)
@@ -93,7 +97,6 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
   const audioContextRef = useRef<AudioContext | null>(null)
   const analyserRef = useRef<AnalyserNode | null>(null)
 
-  const { toast } = useToast()
   const { sendMessage, connectionState, registerMessageHandler } = useWebSocket()
 
   // Initialize services
@@ -113,16 +116,8 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
           const primaryService =
             availableServices[0] === "google-free" ? "Google Translate (Free)" : availableServices[0]
           setTranslationService(primaryService)
-          toast({
-            title: "Translation Ready",
-            description: `Primary: ${primaryService}, Fallbacks: ${availableServices.slice(1).join(", ")}`,
-          })
         } else {
-          toast({
-            title: "Translation Limited",
-            description: "Using offline translation for common phrases",
-            variant: "destructive",
-          })
+          setTranslationService("Offline phrases only")
         }
       })
     }
@@ -166,22 +161,20 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
       )
     } catch (error) {
       console.error("Error accessing media devices:", error)
-      toast({
-        title: "Media Access Error",
-        description: "Please allow camera and microphone access",
-        variant: "destructive",
-      })
+      setCallNotice("Camera or microphone is blocked. Allow access in your browser's site settings, then try again.")
     }
   }
 
   const setupAudioAnalysis = (stream: MediaStream) => {
     try {
-      audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)()
-      const source = audioContextRef.current.createMediaStreamSource(stream)
-      analyserRef.current = audioContextRef.current.createAnalyser()
+      const audioContext: AudioContext = new (window.AudioContext || window.webkitAudioContext)()
+      audioContextRef.current = audioContext
+      const source = audioContext.createMediaStreamSource(stream)
+      const analyser = audioContext.createAnalyser()
+      analyserRef.current = analyser
 
-      analyserRef.current.fftSize = 256
-      source.connect(analyserRef.current)
+      analyser.fftSize = 256
+      source.connect(analyser)
 
       console.log("Audio analysis setup complete")
     } catch (error) {
@@ -191,20 +184,12 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
 
   const startTranscription = () => {
     if (!speechRecognitionRef.current) {
-      toast({
-        title: "Transcription Error",
-        description: "Speech recognition not available",
-        variant: "destructive",
-      })
+      setCallNotice("Speech recognition is not available.")
       return
     }
 
     if (!speechRecognitionRef.current.isRecognitionSupported()) {
-      toast({
-        title: "Not Supported",
-        description: "Speech recognition not supported in this browser",
-        variant: "destructive",
-      })
+      setCallNotice("This browser cannot turn speech into text. Try Chrome or Edge.")
       return
     }
 
@@ -245,6 +230,7 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
           sendMessage({
             type: "chat-message",
             message: finalMessage,
+            transcribed: true, // extra field; older clients ignore it and still get the marked text
             targetId,
             senderId: peerId,
           })
@@ -253,11 +239,7 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
       (error: string) => {
         console.error("Speech recognition error:", error)
         setIsTranscribing(false)
-        toast({
-          title: "Transcription Error",
-          description: `Speech recognition failed: ${error}`,
-          variant: "destructive",
-        })
+        setCallNotice(`Speech to text stopped: ${error}`)
       },
       () => {
         // Restart if still transcribing
@@ -271,10 +253,6 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
 
     if (success) {
       setIsTranscribing(true)
-      toast({
-        title: "Transcription Started",
-        description: `Converting ${transcriptionLanguage} speech to text...`,
-      })
     }
   }
 
@@ -284,10 +262,6 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
       setIsTranscribing(false)
       setTranscriptionConfidence(0)
       console.log("Speech transcription stopped")
-      toast({
-        title: "Transcription Stopped",
-        description: "Speech to text disabled",
-      })
     }
   }
 
@@ -313,10 +287,6 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
       }, 500)
     }
 
-    toast({
-      title: "Language Changed",
-      description: `Transcription language set to ${lang}`,
-    })
   }
 
   // Register message handler for call-related messages
@@ -347,6 +317,10 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
         case "ice-candidate":
           handleIceCandidate(data.candidate)
           break
+        case "call-failed":
+          setCallState("idle")
+          setCallNotice(data.reason === "User not found" ? "Your friend is not at the table right now, so the call could not ring." : `The call failed: ${data.reason ?? "unknown reason"}`)
+          break
         default:
           // Ignore other message types
           break
@@ -354,7 +328,10 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
     })
 
     return unregister
-  }, [registerMessageHandler, peerId, targetId])
+    // No dependency list on purpose: the handlers read peerConnection / localStream / ICE queue state, so they must be
+    // re-registered after every render. With the old deps they stayed frozen on the first render, which made the
+    // answerer build a second, track-less peer connection and the caller drop the answer.
+  })
 
   const createPeerConnection = () => {
     console.log("Creating peer connection...")
@@ -394,12 +371,9 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
       console.log("Peer connection state changed:", pc.connectionState)
       if (pc.connectionState === "connected") {
         setCallState("active")
-        toast({
-          title: "Call Connected",
-          description: "Voice/video call is now active",
-        })
       } else if (pc.connectionState === "disconnected" || pc.connectionState === "failed") {
         console.log("Call disconnected or failed")
+        if (pc.connectionState === "failed") setCallNotice("The call dropped because the two of you could not stay connected.")
         endCall()
       }
     }
@@ -425,13 +399,10 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
 
   const startCall = async (videoCall = false) => {
     console.log("Starting call, video:", videoCall)
+    setCallNotice(null)
 
     if (connectionState !== "connected") {
-      toast({
-        title: "Error",
-        description: "Not connected to signaling server",
-        variant: "destructive",
-      })
+      setCallNotice("Not connected to the server, so the call cannot ring yet.")
       return
     }
 
@@ -443,11 +414,7 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
     }
 
     if (!localStream) {
-      toast({
-        title: "Error",
-        description: "Local media not available",
-        variant: "destructive",
-      })
+      setCallNotice("Your camera and microphone are not available, so the call cannot start.")
       return
     }
 
@@ -465,10 +432,6 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
         senderId: peerId,
       })
 
-      toast({
-        title: "Calling...",
-        description: `${videoCall ? "Video" : "Voice"} call initiated`,
-      })
     } catch (error) {
       console.error("Error starting call:", error)
       setCallState("idle")
@@ -480,12 +443,7 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
     setCallState("ringing")
     setIsVideoCall(data.isVideo)
     setIsInitiator(false)
-
-    toast({
-      title: "Incoming Call",
-      description: `${data.isVideo ? "Video" : "Voice"} call from ${data.senderId}`,
-      duration: 15000,
-    })
+    setCallNotice(null)
   }
 
   const acceptCall = async () => {
@@ -516,11 +474,7 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
       console.log("Call accepted, waiting for offer...")
     } catch (error) {
       console.error("Error accepting call:", error)
-      toast({
-        title: "Error",
-        description: "Failed to accept call: " + error.message,
-        variant: "destructive",
-      })
+      setCallNotice("Could not pick up the call: " + (error as Error).message)
       rejectCall()
     }
   }
@@ -534,11 +488,6 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
     })
 
     setCallState("idle")
-
-    toast({
-      title: "Call Rejected",
-      description: "Call was rejected",
-    })
   }
 
   const handleCallAccepted = async (data: any) => {
@@ -570,23 +519,14 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
       })
     } catch (error) {
       console.error("Error handling call accepted:", error)
-      toast({
-        title: "Error",
-        description: "Failed to create call offer",
-        variant: "destructive",
-      })
+      setCallNotice("Could not set up the call.")
     }
   }
 
   const handleCallRejected = () => {
     console.log("Call was rejected")
     setCallState("idle")
-
-    toast({
-      title: "Call Rejected",
-      description: "Your call was rejected",
-      variant: "destructive",
-    })
+    setCallNotice("They declined the call.")
   }
 
   const endCall = () => {
@@ -616,11 +556,6 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
     setRemoteStream(null)
     setIceCandidatesQueue([])
     setIsInitiator(false)
-
-    toast({
-      title: "Call Ended",
-      description: "Call terminated",
-    })
   }
 
   const handleOffer = async (offer: RTCSessionDescriptionInit) => {
@@ -664,11 +599,7 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
       })
     } catch (error) {
       console.error("Error handling offer:", error)
-      toast({
-        title: "Error",
-        description: "Failed to handle call offer",
-        variant: "destructive",
-      })
+      setCallNotice("Could not set up the call.")
     }
   }
 
@@ -755,6 +686,8 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
     translationService,
     localStream,
     remoteStream,
+    callNotice,
+    clearCallNotice: () => setCallNotice(null),
     connectionState,
     startCall,
     endCall,

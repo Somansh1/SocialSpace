@@ -1,45 +1,52 @@
 import type React from "react"
-import type { Metadata } from "next"
-import { Inter } from "next/font/google"
+import type { Metadata, Viewport } from "next"
+import { Fraunces, DM_Sans } from "next/font/google"
 import "./globals.css"
-import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
 import { PWAInstaller } from "@/components/pwa-installer"
 
-const inter = Inter({ subsets: ["latin"] })
+// Fraunces carries the headings and both people's names (italic); DM Sans is for everything you read or press.
+const display = Fraunces({
+  subsets: ["latin"],
+  style: ["normal", "italic"],
+  axes: ["SOFT", "WONK"],
+  variable: "--font-display",
+  display: "swap",
+})
+const text = DM_Sans({ subsets: ["latin"], variable: "--font-text", display: "swap" })
+
+// Absolute URL used for the share image. Set NEXT_PUBLIC_SITE_URL (for example https://socialspace.example)
+// in the deployment's environment; the host's production-URL variable is used if it is present.
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000")
+
+const description = "A private table for two: talk, chat, draw and watch together."
 
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: "SocialSpace",
-  description: "Real-time communication app with voice calls, chat, and media sharing",
-  manifest: "/manifest.json",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "default",
-    title: "SocialSpace",
-  },
-    generator: 'v0.dev'
+  description,
+  applicationName: "SocialSpace",
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "SocialSpace" },
+  openGraph: { type: "website", siteName: "SocialSpace", title: "SocialSpace, a table for two", description },
+  twitter: { card: "summary_large_image", title: "SocialSpace, a table for two", description },
 }
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+// Zoom stays enabled on purpose.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#F4EDE0",
+}
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="SocialSpace" />
-        <link rel="apple-touch-icon" href="/icon-192x192.png" />
-      </head>
-      <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
-          <PWAInstaller />
-          {children}
-          <Toaster />
-        </ThemeProvider>
+    <html lang="en" className={`${display.variable} ${text.variable}`}>
+      <body>
+        <PWAInstaller />
+        {children}
+        <Toaster />
       </body>
     </html>
   )
