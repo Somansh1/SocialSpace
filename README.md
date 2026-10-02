@@ -40,6 +40,8 @@ Open the page in two browser windows (or two devices), use the invite link from 
 
 If `NEXT_PUBLIC_BACKEND_URL` is not set, the interface falls back to the relay the author hosts (`wss://socialspace-bakend.onrender.com`). Set your own if you fork this.
 
+Checks: `npm run check` runs the relay check (`scripts/relay-check.js`, starts `server.js` on a random port) and the link-validation check.
+
 ## Invite links
 
 The first screen builds a link of the form `/?i=<friend's name>&with=<your name>`. The two values are swapped, so when your friend opens it, their name is already in the first blank and yours in the second. Names are lower-cased, spaces become dashes, only `a-z 0-9 - _` are kept, up to 32 characters.
@@ -68,8 +70,9 @@ On a hosting service that builds Next.js for you, set the same two variables in 
 
 ## Limitations
 
-- No accounts or authentication. Anyone can register any name, including one in use, and the relay will hand it to the newest connection. Treat names as meeting places, not identities.
+- No accounts or authentication. Anyone can register any name, including one in use, and the relay will hand it to the newest connection (the older socket stops receiving but is not closed, so two tabs with one name do not fight over it). Treat names as meeting places, not identities. Everything received over the relay is untrusted: the interface only turns `http:`/`https:` links into clickable links, embeds or video sources (`lib/safe-url.ts`).
 - The relay tells every connected client when any name disconnects, and forwards anything addressed to a name. Do not rely on it for privacy beyond that.
+- The relay ignores anything that is not a JSON object, anything sent before a name is registered, and empty names; messages over 10 MiB close that one connection (shared pictures travel as base64, so very large files will not arrive). These fixes only apply once the relay you actually use is redeployed.
 - No TURN server, so calls can fail between restrictive networks (some corporate or mobile networks).
 - Free hosting often puts the relay to sleep, so the first connection can take up to a minute. The page shows "Connecting to the server" while it waits.
 - Direct video files (.mp4, .webm, .ogg) stay in sync. YouTube, Twitch, Vimeo and Dailymotion links open for both people, but each controls their own player.
