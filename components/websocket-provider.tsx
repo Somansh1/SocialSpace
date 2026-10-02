@@ -31,7 +31,7 @@ interface WebSocketProviderProps {
 export function WebSocketProvider({ children, peerId }: WebSocketProviderProps) {
   const [ws, setWs] = useState<WebSocket | null>(null)
   const [connectionState, setConnectionState] = useState<"disconnected" | "connecting" | "connected">("connecting")
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout>()
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const socketRef = useRef<WebSocket | null>(null)
   const closedByUsRef = useRef(false)
   const messageHandlersRef = useRef<Set<(data: any) => void>>(new Set())

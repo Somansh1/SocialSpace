@@ -2,32 +2,19 @@
 @tailwind components;
 @tailwind utilities;
 
-/*
-  Kitchen Table palette. The shadcn variables below are mapped onto it so any
-  leftover shadcn primitive (toast, select) matches instead of showing slate/blue.
-*/
+/* Kitchen Table palette. The CSS variables below feed the toast component; everything else uses the named colours in tailwind.config.ts. */
 @layer base {
   :root {
     --background: 38 41% 91%;
     --foreground: 33 16% 12%;
-    --card: 45 100% 98%;
-    --card-foreground: 33 16% 12%;
-    --popover: 45 100% 98%;
-    --popover-foreground: 33 16% 12%;
-    --primary: 33 16% 12%;
-    --primary-foreground: 45 100% 98%;
     --secondary: 38 33% 85%;
     --secondary-foreground: 33 16% 12%;
     --muted: 38 33% 85%;
     --muted-foreground: 33 11% 38%;
-    --accent: 38 33% 85%;
-    --accent-foreground: 33 16% 12%;
     --destructive: 3 66% 41%;
     --destructive-foreground: 45 100% 98%;
     --border: 33 16% 12%;
-    --input: 33 16% 12%;
     --ring: 12 77% 54%;
-    --radius: 6px;
   }
 }
 

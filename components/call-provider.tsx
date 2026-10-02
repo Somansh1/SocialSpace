@@ -53,8 +53,8 @@ interface CallContextType {
   setTranscriptionLanguage: (lang: string) => void
 
   // Refs for video elements
-  localVideoRef: React.RefObject<HTMLVideoElement>
-  remoteVideoRef: React.RefObject<HTMLVideoElement>
+  localVideoRef: React.RefObject<HTMLVideoElement | null>
+  remoteVideoRef: React.RefObject<HTMLVideoElement | null>
 }
 
 const CallContext = createContext<CallContextType | undefined>(undefined)
@@ -167,12 +167,14 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
 
   const setupAudioAnalysis = (stream: MediaStream) => {
     try {
-      audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)()
-      const source = audioContextRef.current.createMediaStreamSource(stream)
-      analyserRef.current = audioContextRef.current.createAnalyser()
+      const audioContext: AudioContext = new (window.AudioContext || window.webkitAudioContext)()
+      audioContextRef.current = audioContext
+      const source = audioContext.createMediaStreamSource(stream)
+      const analyser = audioContext.createAnalyser()
+      analyserRef.current = analyser
 
-      analyserRef.current.fftSize = 256
-      source.connect(analyserRef.current)
+      analyser.fftSize = 256
+      source.connect(analyser)
 
       console.log("Audio analysis setup complete")
     } catch (error) {

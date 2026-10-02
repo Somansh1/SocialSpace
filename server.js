@@ -1,11 +1,13 @@
 const { WebSocketServer } = require("ws")
 
-const wss = new WebSocketServer({ port: 8080 })
+// Hosting platforms hand the port in through PORT; locally it stays 8080.
+const PORT = Number(process.env.PORT) || 8080
+const wss = new WebSocketServer({ port: PORT })
 
 // A map to store connections, with the peerId as the key.
 const clients = new Map()
 
-console.log("Enhanced signaling server started on port 8080...")
+console.log(`Signaling server started on port ${PORT}...`)
 
 wss.on("connection", (ws) => {
   console.log("Client connected")
