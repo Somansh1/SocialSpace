@@ -22,6 +22,23 @@ function Svg({ children, className, title, viewBox = "0 0 64 64" }: IconProps & 
   )
 }
 
+/** The SocialSpace mark: two people either side of a small table, on a paper tile. Same drawing as app/icon.svg. */
+export function Mark({ className, title }: IconProps) {
+  const st = { stroke: INK, strokeWidth: 3.2, strokeLinejoin: "round" as const }
+  return (
+    <svg viewBox="0 0 64 64" className={className} role={title ? "img" : undefined} aria-label={title} aria-hidden={title ? undefined : true} focusable="false">
+      <rect x="2" y="2" width="60" height="60" rx="14" fill={PAPER} stroke={INK} strokeWidth={3.5} />
+      <rect x="21" y="38" width="22" height="6" rx="2" fill={INK} />
+      <rect x="25" y="44" width="5" height="12" fill={INK} />
+      <rect x="34" y="44" width="5" height="12" fill={INK} />
+      <rect x="7" y="31" width="19" height="25" rx="9" fill={YOU} {...st} />
+      <circle cx="16.5" cy="20" r="8.5" fill={SURFACE} {...st} />
+      <rect x="38" y="31" width="19" height="25" rx="9" fill={FRIEND} {...st} />
+      <circle cx="47.5" cy="20" r="8.5" fill={SURFACE} {...st} />
+    </svg>
+  )
+}
+
 export function PhoneObject(p: IconProps) {
   return (
     <Svg {...p}>

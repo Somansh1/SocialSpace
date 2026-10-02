@@ -14,20 +14,11 @@ export function PWAInstaller() {
   const [isIOS, setIsIOS] = useState(false)
 
   useEffect(() => {
-    // --- START: Added Code for Service Worker Registration ---
     if ("serviceWorker" in navigator) {
-      window.addEventListener("load", () => {
-        navigator.serviceWorker
-          .register("/sw.js")
-          .then((registration) => {
-            console.log("Service Worker registered: ", registration)
-          })
-          .catch((registrationError) => {
-            console.log("Service Worker registration failed: ", registrationError)
-          })
-      })
+      const register = () => navigator.serviceWorker.register("/sw.js").catch((err) => console.warn("Service worker not registered:", err))
+      if (document.readyState === "complete") register()
+      else window.addEventListener("load", register, { once: true })
     }
-    // --- END: Added Code for Service Worker Registration ---
 
     const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
     setIsIOS(iOS)

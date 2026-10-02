@@ -15,15 +15,22 @@ const display = Fraunces({
 })
 const text = DM_Sans({ subsets: ["latin"], variable: "--font-text", display: "swap" })
 
+// Absolute URL used for the share image. Set NEXT_PUBLIC_SITE_URL (for example https://socialspace.example)
+// in the deployment's environment; the host's production-URL variable is used if it is present.
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000")
+
+const description = "A private table for two: talk, chat, draw and watch together."
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: "SocialSpace",
-  description: "A private table for two: talk, chat, draw and watch together.",
-  manifest: "/manifest.json",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "default",
-    title: "SocialSpace",
-  },
+  description,
+  applicationName: "SocialSpace",
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "SocialSpace" },
+  openGraph: { type: "website", siteName: "SocialSpace", title: "SocialSpace, a table for two", description },
+  twitter: { card: "summary_large_image", title: "SocialSpace, a table for two", description },
 }
 
 // Zoom stays enabled on purpose.
@@ -33,18 +40,9 @@ export const viewport: Viewport = {
   themeColor: "#F4EDE0",
 }
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${display.variable} ${text.variable}`}>
-      <head>
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-title" content="SocialSpace" />
-        <link rel="apple-touch-icon" href="/icon-192x192.png" />
-      </head>
       <body>
         <PWAInstaller />
         {children}

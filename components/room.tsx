@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from "react"
 import { Check, Link2, Loader2, LogOut } from "lucide-react"
-import { Chair, NotepadObject, PhoneObject, SketchbookObject, TvObject } from "@/components/art"
+import { Chair, Mark, NotepadObject, PhoneObject, SketchbookObject, TvObject } from "@/components/art"
 import { CallPanel, CallStrip, IncomingCallBanner } from "@/components/call-panel"
 import { ChatPanel } from "@/components/chat-panel"
 import { DrawActivity } from "@/components/draw-activity"
@@ -115,7 +115,10 @@ export function Room({ me, friend, onLeave }: { me: string; friend: string; onLe
 
       {/* top line */}
       <header className="mb-3 flex flex-wrap items-center gap-x-5 gap-y-1">
-        <h1 className="font-display text-2xl font-bold tracking-tight">SocialSpace</h1>
+        <h1 className="flex items-center gap-2 font-display text-2xl font-bold tracking-tight">
+          <Mark className="h-9 w-9" />
+          SocialSpace
+        </h1>
         <button onClick={leave} className="kt-btn kt-btn-sm ml-auto md:order-last">
           <LogOut className="h-4 w-4" aria-hidden />
           Leave table

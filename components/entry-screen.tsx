@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { Link2, Shuffle, Check } from "lucide-react"
-import { TableScene } from "@/components/art"
+import { Mark, TableScene } from "@/components/art"
 import { buildInviteUrl, generateId, normalizeId, readInvite } from "@/lib/ids"
 
 export function EntryScreen({ onJoin }: { onJoin: (me: string, friend: string) => void }) {
@@ -69,7 +69,10 @@ export function EntryScreen({ onJoin }: { onJoin: (me: string, friend: string) =
   return (
     <main className="mx-auto flex min-h-[100dvh] w-full max-w-6xl flex-col justify-center gap-8 px-5 py-8 md:px-10 lg:flex-row lg:items-center lg:gap-14">
       <form onSubmit={join} className="w-full lg:w-[52%]" noValidate>
-        <p className="kt-eyebrow mb-4">SocialSpace, a table for two</p>
+        <p className="mb-5 flex items-center gap-3 font-display text-2xl font-bold tracking-tight">
+          <Mark className="h-11 w-11" />
+          SocialSpace
+        </p>
         <h1 className="font-display text-[32px] font-semibold leading-[1.4] tracking-tight sm:text-[44px] sm:leading-[1.35]">
           I&apos;m{" "}
           <input
