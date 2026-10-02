@@ -12,7 +12,24 @@ const config: Config = {
   ],
   theme: {
   	extend: {
+  		fontFamily: {
+  			display: ['var(--font-display)', 'Georgia', 'serif'],
+  			sans: ['var(--font-text)', 'system-ui', 'sans-serif']
+  		},
+  		boxShadow: {
+  			hard: '4px 4px 0 #231F1A',
+  			'hard-sm': '2px 2px 0 #231F1A'
+  		},
   		colors: {
+  			paper: '#F4EDE0',
+  			surface: '#FFFDF7',
+  			ink: '#231F1A',
+  			mute: '#6B6257',
+  			tan: '#D9B382',
+  			mustard: '#E0A526',
+  			danger: '#B3261E',
+  			you: { DEFAULT: '#E4572E', ink: '#B8401E', tint: '#F8D9CC' },
+  			friend: { DEFAULT: '#2F7F79', ink: '#256A65', tint: '#D3E8E4' },
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
   			card: {

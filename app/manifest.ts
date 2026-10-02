@@ -4,11 +4,11 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "SocialSpace",
     short_name: "SocialSpace",
-    description: "Real-time communication app with voice calls, chat, and media sharing",
+    description: "A private table for two: talk, chat, draw and watch together.",
     start_url: "/",
     display: "standalone",
-    background_color: "#000000",
-    theme_color: "#3b82f6",
+    background_color: "#F4EDE0",
+    theme_color: "#F4EDE0",
     orientation: "portrait",
     icons: [
       {
