@@ -79,4 +79,4 @@ On a hosting service that builds Next.js for you, set the same two variables in 
 
 ## Licence
 
-No licence file is included because the owner has not chosen one. Until one is added, the default is that all rights are reserved.
+No licence has been chosen yet, so by default all rights are reserved.
