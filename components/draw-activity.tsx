@@ -4,6 +4,7 @@ import type React from "react"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Check, Eraser, ImageIcon, LinkIcon, Upload, Video as VideoIcon } from "lucide-react"
 import { useWebSocket } from "@/components/websocket-provider"
+import { safeHttpUrl, safeMediaSrc } from "@/lib/safe-url"
 
 // Drawing runs on a fixed-size canvas, so both people share the same coordinate space whatever their screen size.
 // Points travel as 0..1 fractions (the existing "drawing-data" message, unchanged).
@@ -86,7 +87,12 @@ export function DrawActivity({ me, friend }: { me: string; friend: string }) {
         wipe() // a remote clear must NOT be echoed back, or the two sides would clear each other forever
         remoteLast.current = null
       } else if (data.type === "media-share") {
-        setItems((prev) => [...prev, { id: `${Date.now()}${Math.random()}`, type: data.mediaType, url: data.url, name: data.name }])
+        // untrusted: only known kinds, and only http(s) (or an uploaded picture/video data URL for image/video)
+        const type = data.mediaType
+        if (type !== "image" && type !== "video" && type !== "link") return
+        const url = type === "link" ? safeHttpUrl(data.url) : safeMediaSrc(data.url)
+        if (!url) return
+        setItems((prev) => [...prev, { id: `${Date.now()}${Math.random()}`, type, url, name: String(data.name ?? "").slice(0, 200) }])
       }
     })
   })
@@ -146,8 +152,9 @@ export function DrawActivity({ me, friend }: { me: string; friend: string }) {
 
   const addLink = () => {
     try {
-      const u = new URL(linkInput.trim())
-      const m: MediaItem = { id: `${Date.now()}${Math.random()}`, type: "link", url: u.href, name: u.hostname }
+      const href = safeHttpUrl(linkInput)
+      if (!href) throw new Error("not an http(s) link")
+      const m: MediaItem = { id: `${Date.now()}${Math.random()}`, type: "link", url: href, name: new URL(href).hostname }
       setItems((prev) => [...prev, m])
       share(m)
       setLinkInput("")
@@ -238,7 +245,7 @@ export function DrawActivity({ me, friend }: { me: string; friend: string }) {
       ) : (
         <div className="kt-panel flex flex-col items-start gap-3 p-5">
           <p className="font-display text-xl font-semibold">{selected?.name}</p>
-          <a href={selected?.url} target="_blank" rel="noopener noreferrer" className="kt-btn">
+          <a href={safeHttpUrl(selected?.url) ?? undefined} target="_blank" rel="noopener noreferrer" className="kt-btn">
             Open the link in a new tab
           </a>
         </div>
