@@ -116,7 +116,11 @@ export function Room({ me, friend, onLeave }: { me: string; friend: string; onLe
       {/* top line */}
       <header className="mb-3 flex flex-wrap items-center gap-x-5 gap-y-1">
         <h1 className="font-display text-2xl font-bold tracking-tight">SocialSpace</h1>
-        <p className="flex flex-wrap items-baseline gap-x-4 text-[15px]">
+        <button onClick={leave} className="kt-btn kt-btn-sm ml-auto md:order-last">
+          <LogOut className="h-4 w-4" aria-hidden />
+          Leave table
+        </button>
+        <p className="flex basis-full flex-wrap items-baseline gap-x-4 text-[15px] md:basis-auto">
           <span>
             <span className="text-mute">you </span>
             <span className="font-display text-lg font-semibold italic text-you-ink">{me}</span>
@@ -129,21 +133,17 @@ export function Room({ me, friend, onLeave }: { me: string; friend: string; onLe
             </span>
           </span>
         </p>
-        <button onClick={leave} className="kt-btn kt-btn-sm ml-auto">
-          <LogOut className="h-4 w-4" aria-hidden />
-          Leave table
-        </button>
       </header>
 
       <StatusBanner status={status} friend={friend} inviteUrl={inviteUrl} retry={retry} />
 
       {/* the table: desktop only. The same four choices are the dock on mobile. */}
       <nav aria-label="Activities" className="mx-auto mt-4 hidden items-end justify-center md:flex">
-        <div className="flex flex-col items-center">
-          <Chair color="#E4572E" occupied className="h-[132px] w-[80px]" title="Your chair, taken" />
-          <span className="mt-1 max-w-[110px] truncate font-display text-sm font-semibold italic text-you-ink">{me}</span>
+        <div className="flex w-[130px] flex-col items-end">
+          <Chair color="#E4572E" occupied className="h-[112px] w-[68px]" title="Your chair, taken" />
+          <span className="mt-1 max-w-full truncate font-display text-sm font-semibold italic text-you-ink">{me}</span>
         </div>
-        <div className="relative mx-[-6px] pb-[26px]">
+        <div className="relative pb-[22px]">
           <div className="flex items-end gap-2 rounded-[8px] border-[3px] border-ink bg-tan px-4 pb-3 pt-6 shadow-hard">
             {OBJECTS.map(({ id, label, Icon }) => {
               const active = isActive(id)
@@ -170,14 +170,14 @@ export function Room({ me, friend, onLeave }: { me: string; friend: string; onLe
               )
             })}
           </div>
-          <span aria-hidden className="absolute bottom-0 left-6 block h-[26px] w-3 border-2 border-t-0 border-ink bg-tan" />
-          <span aria-hidden className="absolute bottom-0 right-6 block h-[26px] w-3 border-2 border-t-0 border-ink bg-tan" />
+          <span aria-hidden className="absolute bottom-0 left-6 block h-[22px] w-3 border-2 border-t-0 border-ink bg-tan" />
+          <span aria-hidden className="absolute bottom-0 right-6 block h-[22px] w-3 border-2 border-t-0 border-ink bg-tan" />
         </div>
-        <div className="flex flex-col items-center">
-          <Chair color="#2F7F79" occupied={friendHere} flip className="h-[132px] w-[80px]" title={friendHere ? `${friend}'s chair, taken` : `${friend}'s chair, empty`} />
-          <span className="mt-1 max-w-[110px] truncate font-display text-sm font-semibold italic text-friend-ink">
+        <div className="flex w-[130px] flex-col items-start pl-1">
+          <Chair color="#2F7F79" occupied={friendHere} flip className="h-[112px] w-[68px]" title={friendHere ? `${friend}'s chair, taken` : `${friend}'s chair, empty`} />
+          <span className="mt-1 max-w-full truncate pl-2 font-display text-sm font-semibold italic text-friend-ink">
             {friend}
-            <span className="font-sans text-xs not-italic text-mute"> {friendHere ? "is here" : "away"}</span>
+            <span className="block pl-0 font-sans text-xs not-italic text-mute">{friendHere ? "is here" : status.startsWith("server") ? "status unknown" : status === "left" ? "left" : "not here yet"}</span>
           </span>
         </div>
       </nav>
@@ -212,7 +212,7 @@ export function Room({ me, friend, onLeave }: { me: string; friend: string; onLe
               <CallStrip friend={friend} onBack={() => { setChatOpen(false); setMain("talk") }} />
             </div>
           </div>
-          <div className="kt-panel mx-3 mb-3 min-h-0 flex-1 overflow-hidden md:sticky md:top-4 md:mx-0 md:mb-0 md:h-[calc(100dvh-2rem)] md:max-h-[640px]">
+          <div className="kt-panel mx-3 mb-3 min-h-0 flex-1 overflow-hidden md:sticky md:top-4 md:mx-0 md:mb-0 md:h-[min(640px,calc(100dvh-300px))] md:min-h-[440px]">
             <ChatPanel me={me} friend={friend} friendHere={friendHere} open={chatOpen} onClose={() => setChatOpen(false)} onUnreadChange={onUnread} />
           </div>
         </aside>

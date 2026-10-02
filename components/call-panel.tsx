@@ -30,11 +30,11 @@ export function IncomingCallBanner({ friend }: { friend: string }) {
   return (
     <div
       role="alert"
-      className="kt-enter kt-panel fixed left-3 right-3 top-3 z-50 flex flex-wrap items-center gap-3 p-3 md:left-auto md:right-6 md:top-6 md:w-[460px]"
+      className="kt-enter kt-panel sticky top-2 z-50 mb-3 flex flex-wrap items-center gap-3 bg-surface p-3"
     >
       <div className="min-w-0 flex-1">
         <p className="kt-eyebrow">Incoming {isVideoCall ? "video" : "voice"} call</p>
-        <p className="truncate font-display text-xl font-semibold italic text-friend-ink">{friend} is calling</p>
+        <p className="font-display text-xl font-semibold italic text-friend-ink">{friend} is calling</p>
       </div>
       <div className="flex gap-2">
         <button onClick={acceptCall} className="kt-btn kt-btn-primary">
@@ -82,21 +82,23 @@ function Polaroid({
   tone,
   children,
   caption,
+  compact = false,
   className = "",
 }: {
   who: string
   tone: "you" | "friend"
   children: React.ReactNode
   caption: string
+  compact?: boolean
   className?: string
 }) {
   const frame = tone === "you" ? "border-you" : "border-friend"
   const nameColor = tone === "you" ? "text-you-ink" : "text-friend-ink"
   return (
-    <figure className={`rounded-[6px] border-2 border-ink bg-surface p-2.5 pb-3 shadow-hard ${className}`}>
-      <div className={`relative aspect-[4/3] overflow-hidden border-[5px] bg-ink ${frame}`}>{children}</div>
+    <figure className={`rounded-[6px] border-2 border-ink bg-surface p-2 pb-2.5 shadow-hard md:p-2.5 md:pb-3 ${className}`}>
+      <div className={`relative aspect-[16/10] overflow-hidden border-[5px] bg-ink ${frame}`}>{children}</div>
       <figcaption className="mt-2 flex items-baseline justify-between gap-2 px-1">
-        <span className={`truncate font-display text-lg font-semibold italic ${nameColor}`}>{who}</span>
+        <span className={`truncate font-display font-semibold italic ${compact ? "text-sm md:text-lg" : "text-lg"} ${nameColor}`}>{who}</span>
         <span className="shrink-0 text-xs font-semibold text-mute">{caption}</span>
       </figcaption>
     </figure>
@@ -168,7 +170,7 @@ export function CallPanel({
         </div>
       )}
 
-      <div className="grid items-start gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,240px)] lg:grid-cols-[minmax(0,1fr)_280px]">
+      <div className="grid items-start justify-center gap-5 md:grid-cols-[minmax(0,560px)_minmax(0,230px)]">
         <Polaroid who={friend} tone="friend" caption={friendCaption} className="md:-rotate-[0.8deg]">
           <video
             key={remoteStream ? "live" : "idle"}
@@ -184,13 +186,13 @@ export function CallPanel({
                 {friend.charAt(0).toUpperCase()}
               </span>
               <span className="text-sm font-semibold">
-                {callState === "idle" ? (friendHere ? `${friend} is at the table. Ring them.` : `Waiting for ${friend} to sit down.`) : "Getting the picture..."}
+                {callState === "idle" ? (friendHere ? `${friend} is at the table. Ring them.` : "Not at the table yet.") : "Getting the picture..."}
               </span>
             </div>
           )}
         </Polaroid>
 
-        <Polaroid who={`${me} (you)`} tone="you" caption={isVideoMuted ? "camera off" : isMuted ? "muted" : "live"} className="mx-auto w-full max-w-[280px] md:rotate-[1deg]">
+        <Polaroid who={me} tone="you" caption={isVideoMuted ? "you, camera off" : isMuted ? "you, muted" : "you"} compact className="relative -mt-28 ml-auto mr-2 w-[150px] md:mx-auto md:mt-8 md:w-full md:max-w-[260px] md:rotate-[1deg]">
           <video
             ref={localVideoRef}
             autoPlay
@@ -208,7 +210,7 @@ export function CallPanel({
       </div>
 
       {/* controls */}
-      <div className="kt-panel flex flex-wrap items-center gap-2 p-3" role="group" aria-label="Call controls">
+      <div className="kt-panel sticky bottom-[84px] z-20 flex flex-wrap items-center gap-2 p-3 md:static" role="group" aria-label="Call controls">
         {!live && (
           <>
             <button onClick={() => startCall(false)} disabled={!canRing} className="kt-btn kt-btn-primary">

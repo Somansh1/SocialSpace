@@ -140,10 +140,9 @@ export function ChatPanel({
     <section aria-label="Chat" className="flex h-full min-h-0 flex-col bg-surface">
       <header className="flex items-center gap-2 border-b-2 border-ink px-3 py-2">
         <h2 className="font-display text-2xl font-semibold">Chat</h2>
-        <span className="text-xs text-mute">translate: {translationService}</span>
-        <button onClick={() => setReadAloud((v) => !v)} aria-pressed={readAloud} className="kt-btn kt-btn-sm ml-auto">
+        <button onClick={() => setReadAloud((v) => !v)} aria-pressed={readAloud} title={`Translations use ${translationService}`} className="kt-btn kt-btn-sm ml-auto whitespace-nowrap">
           {readAloud ? <Volume2 className="h-4 w-4" aria-hidden /> : <VolumeX className="h-4 w-4" aria-hidden />}
-          Read aloud {readAloud ? "on" : "off"}
+          Read aloud: {readAloud ? "on" : "off"}
         </button>
         <button onClick={onClose} className="kt-btn kt-btn-sm min-w-[44px] px-2" aria-label="Close chat">
           <X className="h-4 w-4" aria-hidden />
@@ -207,7 +206,7 @@ export function ChatPanel({
             id="chat-draft"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            placeholder={`Say something to ${friend}`}
+            placeholder="Write a message"
             autoComplete="off"
             className="kt-field flex-1"
           />

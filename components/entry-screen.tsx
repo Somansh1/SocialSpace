@@ -63,13 +63,14 @@ export function EntryScreen({ onJoin }: { onJoin: (me: string, friend: string) =
     setFromInvite(false)
   }
 
-  const blank = (value: string) => ({ width: `${Math.max(value.length, 8) + 1}ch`, maxWidth: "100%" })
+  // a little under 1ch per character: the blanks are set in italic Fraunces, which is narrower than the 0 that ch measures
+  const blank = (value: string) => ({ width: `${Math.max(value.length, 8) * 0.82 + 2}ch`, maxWidth: "100%" })
 
   return (
     <main className="mx-auto flex min-h-[100dvh] w-full max-w-6xl flex-col justify-center gap-8 px-5 py-8 md:px-10 lg:flex-row lg:items-center lg:gap-14">
       <form onSubmit={join} className="w-full lg:w-[52%]" noValidate>
         <p className="kt-eyebrow mb-4">SocialSpace, a table for two</p>
-        <h1 className="font-display text-[34px] font-semibold leading-[1.35] tracking-tight sm:text-5xl sm:leading-[1.3]">
+        <h1 className="font-display text-[32px] font-semibold leading-[1.4] tracking-tight sm:text-[44px] sm:leading-[1.35]">
           I&apos;m{" "}
           <input
             id="me"

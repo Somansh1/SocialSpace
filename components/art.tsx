@@ -91,10 +91,10 @@ export function TableScene({ friendHere = false, className }: { friendHere?: boo
       <path d="M260 0v44" {...stroke} />
       <path d="M222 86q0-42 38-42t38 42z" fill={MUSTARD} {...stroke} />
       {/* things on the table, back row */}
-      <svg x="118" y="106" width="76" height="76" viewBox="0 0 64 64"><NotepadInner /></svg>
-      <svg x="198" y="104" width="76" height="76" viewBox="0 0 64 64"><SketchInner /></svg>
-      <svg x="278" y="102" width="80" height="80" viewBox="0 0 64 64"><TvInner /></svg>
-      <svg x="364" y="108" width="72" height="72" viewBox="0 0 64 64"><PhoneInner /></svg>
+      <svg x="118" y="112" width="76" height="76" viewBox="0 0 64 64"><NotepadInner /></svg>
+      <svg x="198" y="110" width="76" height="76" viewBox="0 0 64 64"><SketchInner /></svg>
+      <svg x="278" y="108" width="80" height="80" viewBox="0 0 64 64"><TvInner /></svg>
+      <svg x="364" y="114" width="72" height="72" viewBox="0 0 64 64"><PhoneInner /></svg>
       {/* table */}
       <rect x="92" y="180" width="336" height="22" rx="5" fill={TAN} {...stroke} />
       <rect x="116" y="202" width="14" height="82" rx="2" fill={TAN} {...stroke} />

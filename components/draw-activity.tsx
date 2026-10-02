@@ -32,7 +32,7 @@ interface MediaItem {
 
 export function DrawActivity({ me, friend }: { me: string; friend: string }) {
   const [colour, setColour] = useState(YOU)
-  const [size, setSize] = useState(5)
+  const [size, setSize] = useState(10)
   const [items, setItems] = useState<MediaItem[]>([])
   const [selected, setSelected] = useState<MediaItem | null>(null)
   const [linkInput, setLinkInput] = useState("")
@@ -200,7 +200,7 @@ export function DrawActivity({ me, friend }: { me: string; friend: string }) {
         </fieldset>
         <label className="flex items-center gap-2 text-sm font-semibold">
           Pen width
-          <input type="range" min={2} max={24} value={size} onChange={(e) => setSize(Number(e.target.value))} className="h-11 w-28 accent-ink" />
+          <input type="range" min={3} max={48} value={size} onChange={(e) => setSize(Number(e.target.value))} className="h-11 w-28 accent-ink" />
           <span className="w-8 tabular-nums text-mute">{size}</span>
         </label>
         <button onClick={clearForBoth} className="kt-btn kt-btn-sm ml-auto" title="Wipes the paper for both of you">
