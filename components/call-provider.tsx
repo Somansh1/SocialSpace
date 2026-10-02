@@ -58,6 +58,18 @@ interface CallContextType {
   remoteVideoRef: React.RefObject<HTMLVideoElement | null>
 }
 
+// STUN alone cannot connect two people who are both behind strict NATs (most mobile data, some campus and office
+// Wi-Fi); that needs a TURN relay. Set NEXT_PUBLIC_ICE_SERVERS to a JSON array of RTCIceServer objects to add one.
+const iceServers: RTCIceServer[] = (() => {
+  try {
+    const custom = JSON.parse(process.env.NEXT_PUBLIC_ICE_SERVERS || "null")
+    if (Array.isArray(custom) && custom.length) return custom
+  } catch {
+    console.error("NEXT_PUBLIC_ICE_SERVERS is not valid JSON; using the default STUN servers")
+  }
+  return [{ urls: "stun:stun.l.google.com:19302" }, { urls: "stun:stun1.l.google.com:19302" }]
+})()
+
 const CallContext = createContext<CallContextType | undefined>(undefined)
 
 export function useCall() {
@@ -84,10 +96,8 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
   const [transcriptionLanguage, setTranscriptionLanguageState] = useState("en-US")
   const [transcriptionConfidence, setTranscriptionConfidence] = useState(0)
   const [translationService, setTranslationService] = useState("LibreTranslate")
-  const [peerConnection, setPeerConnection] = useState<RTCPeerConnection | null>(null)
   const [localStream, setLocalStream] = useState<MediaStream | null>(null)
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null)
-  const [iceCandidatesQueue, setIceCandidatesQueue] = useState<RTCIceCandidateInit[]>([])
   const [isInitiator, setIsInitiator] = useState(false)
   const [callNotice, setCallNotice] = useState<string | null>(null)
 
@@ -100,10 +110,11 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
 
   const { sendMessage, connectionState, registerMessageHandler } = useWebSocket()
 
-  // Latest values for callbacks that outlive the render they were created in (the peer connection's
-  // onconnectionstatechange, and the unmount cleanup). Reading the state variables there sees the first render's values.
+  // Refs, not state: the signalling handlers are async and messages arrive while they are still awaiting, so they
+  // need the value as it is now, not as it was when the handler started.
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null)
-  peerConnectionRef.current = peerConnection
+  // ICE candidates that arrived before the remote description was set.
+  const pendingCandidates = useRef<RTCIceCandidateInit[]>([])
   const callStateRef = useRef(callState)
   callStateRef.current = callState
   const localStreamRef = useRef<MediaStream | null>(null)
@@ -164,13 +175,14 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
     }
   }, [])
 
-  const initializeLocalMedia = async () => {
+  const initializeLocalMedia = async (): Promise<MediaStream | null> => {
     try {
       console.log("Initializing local media...")
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: true,
-      })
+      // No camera (or one that is busy) must not block a voice call, so fall back to the microphone alone.
+      const stream = await navigator.mediaDevices
+        .getUserMedia({ audio: true, video: true })
+        .catch(() => navigator.mediaDevices.getUserMedia({ audio: true }))
+      localStreamRef.current = stream
       setLocalStream(stream)
 
       if (localVideoRef.current) {
@@ -184,9 +196,11 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
         "Local media initialized successfully:",
         stream.getTracks().map((t) => t.kind),
       )
+      return stream
     } catch (error) {
       console.error("Error accessing media devices:", error)
       setCallNotice("Camera or microphone is blocked. Allow access in your browser's site settings, then try again.")
+      return null
     }
   }
 
@@ -360,13 +374,8 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
 
   const createPeerConnection = () => {
     console.log("Creating peer connection...")
-    const pc = new RTCPeerConnection({
-      iceServers: [
-        { urls: "stun:stun.l.google.com:19302" },
-        { urls: "stun:stun1.l.google.com:19302" },
-        { urls: "stun:stun2.l.google.com:19302" },
-      ],
-    })
+    const pc = new RTCPeerConnection({ iceServers })
+    pendingCandidates.current = []
 
     pc.onicecandidate = (event) => {
       if (event.candidate) {
@@ -394,11 +403,12 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
 
     pc.onconnectionstatechange = () => {
       console.log("Peer connection state changed:", pc.connectionState)
+      if (peerConnectionRef.current !== pc) return // a connection from an earlier call
       if (pc.connectionState === "connected") {
         setCallState("active")
-      } else if (pc.connectionState === "disconnected" || pc.connectionState === "failed") {
-        console.log("Call disconnected or failed")
-        if (pc.connectionState === "failed") setCallNotice("The call dropped because the two of you could not stay connected.")
+      } else if (pc.connectionState === "failed") {
+        // "disconnected" is not handled: it is a blip the browser usually recovers from; it turns into "failed" if not.
+        setCallNotice("The call dropped because the two of you could not stay connected.")
         endCall()
       }
     }
@@ -408,17 +418,18 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
     }
 
     // Add local stream to peer connection
-    if (localStream) {
+    const stream = localStreamRef.current
+    if (stream) {
       console.log("Adding local stream tracks to peer connection")
-      localStream.getTracks().forEach((track) => {
+      stream.getTracks().forEach((track) => {
         console.log("Adding track:", track.kind, track.enabled)
-        pc.addTrack(track, localStream)
+        pc.addTrack(track, stream)
       })
     } else {
       console.warn("No local stream available when creating peer connection")
     }
 
-    setPeerConnection(pc)
+    peerConnectionRef.current = pc
     return pc
   }
 
@@ -431,14 +442,7 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
       return
     }
 
-    if (!localStream) {
-      console.log("No local stream, initializing...")
-      await initializeLocalMedia()
-      // Wait a bit for stream to be set
-      await new Promise((resolve) => setTimeout(resolve, 500))
-    }
-
-    if (!localStream) {
+    if (!(localStreamRef.current ?? (await initializeLocalMedia()))) {
       setCallNotice("Your camera and microphone are not available, so the call cannot start.")
       return
     }
@@ -475,18 +479,11 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
     console.log("Accepting call...")
 
     try {
-      if (!localStream) {
-        console.log("No local stream, initializing for call accept...")
-        await initializeLocalMedia()
-        await new Promise((resolve) => setTimeout(resolve, 500))
-      }
-
-      if (!localStream) {
+      if (!(localStreamRef.current ?? (await initializeLocalMedia()))) {
         throw new Error("Could not initialize local media")
       }
 
-      // Create peer connection
-      const pc = createPeerConnection()
+      createPeerConnection()
 
       // Send acceptance
       console.log("Sending call accepted message")
@@ -520,10 +517,7 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
 
     try {
       // Create peer connection if not exists
-      let pc = peerConnection
-      if (!pc) {
-        pc = createPeerConnection()
-      }
+      const pc = peerConnectionRef.current ?? createPeerConnection()
 
       // Create and send offer
       console.log("Creating offer...")
@@ -573,7 +567,6 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
     if (pc) {
       pc.close()
       peerConnectionRef.current = null
-      setPeerConnection(null)
     }
 
     // Stop transcription
@@ -581,7 +574,7 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
 
     setCallState("idle")
     setRemoteStream(null)
-    setIceCandidatesQueue([])
+    pendingCandidates.current = []
     setIsInitiator(false)
   }
 
@@ -589,26 +582,11 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
     console.log("Handling offer:", offer)
 
     try {
-      let pc = peerConnection
-      if (!pc) {
-        console.log("Creating peer connection for offer...")
-        pc = createPeerConnection()
-      }
+      const pc = peerConnectionRef.current ?? createPeerConnection()
 
       console.log("Setting remote description...")
       await pc.setRemoteDescription(offer)
-
-      // Process queued ICE candidates
-      console.log("Processing queued ICE candidates:", iceCandidatesQueue.length)
-      for (const candidate of iceCandidatesQueue) {
-        try {
-          await pc.addIceCandidate(candidate)
-          console.log("Added queued ICE candidate")
-        } catch (error) {
-          console.error("Error adding queued ICE candidate:", error)
-        }
-      }
-      setIceCandidatesQueue([])
+      await flushCandidates(pc)
 
       // Create and send answer
       console.log("Creating answer...")
@@ -634,21 +612,11 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
     console.log("Handling answer:", answer)
 
     try {
-      if (peerConnection) {
+      const pc = peerConnectionRef.current
+      if (pc) {
         console.log("Setting remote description from answer...")
-        await peerConnection.setRemoteDescription(answer)
-
-        // Process queued ICE candidates
-        console.log("Processing queued ICE candidates:", iceCandidatesQueue.length)
-        for (const candidate of iceCandidatesQueue) {
-          try {
-            await peerConnection.addIceCandidate(candidate)
-            console.log("Added queued ICE candidate")
-          } catch (error) {
-            console.error("Error adding queued ICE candidate:", error)
-          }
-        }
-        setIceCandidatesQueue([])
+        await pc.setRemoteDescription(answer)
+        await flushCandidates(pc)
       } else {
         console.error("No peer connection when handling answer")
       }
@@ -657,16 +625,28 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
     }
   }
 
+  // Adds the candidates that arrived while the remote description was still being set. Read from the ref at
+  // flush time: reading a snapshot taken earlier is what used to lose them and leave calls unable to connect.
+  const flushCandidates = async (pc: RTCPeerConnection) => {
+    const queued = pendingCandidates.current
+    pendingCandidates.current = []
+    console.log("Processing queued ICE candidates:", queued.length)
+    for (const candidate of queued) {
+      await pc.addIceCandidate(candidate).catch((error) => console.error("Error adding queued ICE candidate:", error))
+    }
+  }
+
   const handleIceCandidate = async (candidate: RTCIceCandidateInit) => {
     console.log("Handling ICE candidate:", candidate)
 
     try {
-      if (peerConnection && peerConnection.remoteDescription) {
+      const pc = peerConnectionRef.current
+      if (pc && pc.remoteDescription) {
         console.log("Adding ICE candidate immediately")
-        await peerConnection.addIceCandidate(candidate)
+        await pc.addIceCandidate(candidate)
       } else {
         console.log("Queueing ICE candidate (no remote description yet)")
-        setIceCandidatesQueue((prev) => [...prev, candidate])
+        pendingCandidates.current.push(candidate)
       }
     } catch (error) {
       console.error("Error handling ICE candidate:", error)
