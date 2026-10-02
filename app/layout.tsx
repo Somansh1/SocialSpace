@@ -17,9 +17,9 @@ const text = DM_Sans({ subsets: ["latin"], variable: "--font-text", display: "sw
 
 // Absolute URL used for the share image. Set NEXT_PUBLIC_SITE_URL (for example https://socialspace.example)
 // in the deployment's environment; the host's production-URL variable is used if it is present.
-const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL ||
-  (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000")
+const rawSiteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_PROJECT_PRODUCTION_URL || "http://localhost:3000"
+// A bare host such as "socialspace.example" is accepted too.
+const siteUrl = /^https?:\/\//.test(rawSiteUrl) ? rawSiteUrl : `https://${rawSiteUrl}`
 
 const description = "A private table for two: talk, chat, draw and watch together."
 
