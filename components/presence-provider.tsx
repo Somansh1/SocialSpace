@@ -3,6 +3,7 @@
 import type React from "react"
 import { createContext, useContext, useEffect, useRef, useState } from "react"
 import { useWebSocket } from "@/components/websocket-provider"
+import { play } from "@/lib/sounds"
 
 /**
  * Who is actually at the table, worked out on the clients alone.
@@ -103,6 +104,13 @@ export function PresenceProvider({
     }, PING_MS)
     return () => clearInterval(timer)
   }, [connectionState, peerId, targetId])
+
+  // sound only on real changes, never for the initial "not here" state
+  const wasHere = useRef(false)
+  useEffect(() => {
+    if (friendHere !== wasHere.current) play(friendHere ? "join" : "leave")
+    wasHere.current = friendHere
+  }, [friendHere])
 
   // a new friend id means a new table
   useEffect(() => {

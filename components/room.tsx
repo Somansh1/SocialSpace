@@ -1,7 +1,7 @@
 "use client"
 
-import { useCallback, useState } from "react"
-import { Check, Link2, Loader2, LogOut } from "lucide-react"
+import { useCallback, useEffect, useState } from "react"
+import { Check, Link2, Loader2, LogOut, Volume2, VolumeX } from "lucide-react"
 import { Chair, Mark, NotepadObject, PhoneObject, SketchbookObject, TvObject } from "@/components/art"
 import { CallPanel, CallStrip, IncomingCallBanner } from "@/components/call-panel"
 import { ChatPanel } from "@/components/chat-panel"
@@ -10,6 +10,7 @@ import { WatchActivity } from "@/components/watch-activity"
 import { useCall } from "@/components/call-provider"
 import { usePresence, type PresenceStatus } from "@/components/presence-provider"
 import { buildInviteUrl } from "@/lib/ids"
+import { isMuted, setMuted } from "@/lib/sounds"
 
 type Main = "talk" | "draw" | "watch"
 
@@ -87,6 +88,13 @@ export function Room({ me, friend, onLeave }: { me: string; friend: string; onLe
   const { status, friendHere, retry, sayGoodbye } = usePresence()
   const { callState } = useCall()
 
+  const [soundOff, setSoundOff] = useState(false)
+  useEffect(() => setSoundOff(isMuted()), [])
+  const toggleSound = () => {
+    setMuted(!soundOff)
+    setSoundOff(!soundOff)
+  }
+
   const onUnread = useCallback((n: number) => setUnread(n), [])
   const inviteUrl = typeof window === "undefined" ? "" : buildInviteUrl(window.location.origin, me, friend)
 
@@ -122,6 +130,9 @@ export function Room({ me, friend, onLeave }: { me: string; friend: string; onLe
         <button onClick={leave} className="kt-btn kt-btn-sm ml-auto md:order-last">
           <LogOut className="h-4 w-4" aria-hidden />
           Leave table
+        </button>
+        <button onClick={toggleSound} aria-pressed={soundOff} aria-label="Mute sounds" className="kt-btn kt-btn-sm min-w-[44px] px-2 md:order-last">
+          {soundOff ? <VolumeX className="h-4 w-4" aria-hidden /> : <Volume2 className="h-4 w-4" aria-hidden />}
         </button>
         <p className="flex basis-full flex-wrap items-baseline gap-x-4 text-[15px] md:basis-auto">
           <span>

@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react"
 import { Loader2, Languages, Send, Volume2, VolumeX, X } from "lucide-react"
 import { useWebSocket } from "@/components/websocket-provider"
 import { useCall } from "@/components/call-provider"
+import { play } from "@/lib/sounds"
 import { FreeTranslationService, getLanguageName, getOfflineTranslation } from "@/lib/translation"
 
 type Kind = "text" | "voice" | "translation"
@@ -81,6 +82,7 @@ export function ChatPanel({
         ...prev,
         { id: `${Date.now()}${Math.random()}`, sender: data.senderId, timestamp: new Date(), isOwn: false, ...parsed },
       ])
+      play("received")
       if (!openRef.current) setUnread((n) => n + 1)
       if (readAloudRef.current && typeof window !== "undefined" && window.speechSynthesis) {
         const u = new SpeechSynthesisUtterance(parsed.text)
@@ -109,6 +111,7 @@ export function ChatPanel({
     setNotice("")
     setMessages((prev) => [...prev, { id: `${Date.now()}${Math.random()}`, text, sender: me, timestamp: new Date(), isOwn: true, kind: "text" }])
     sendMessage({ type: "chat-message", message: text, targetId: friend, senderId: me })
+    play("sent")
     setDraft("")
   }
 

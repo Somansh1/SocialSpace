@@ -4,6 +4,7 @@ import type React from "react"
 import { createContext, useContext, useState, useEffect, useRef } from "react"
 import { useWebSocket } from "@/components/websocket-provider"
 import { SpeechRecognitionService } from "@/lib/speech-recognition"
+import { play } from "@/lib/sounds"
 import { FreeTranslationService, getOfflineTranslation } from "@/lib/translation"
 
 // Add type declarations for Web Speech API
@@ -107,6 +108,19 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
   callStateRef.current = callState
   const localStreamRef = useRef<MediaStream | null>(null)
   localStreamRef.current = localStream
+
+  // Sounds follow the call state: ring while ringing (always cleared), then connected / ended chimes.
+  const prevCallState = useRef(callState)
+  useEffect(() => {
+    const prev = prevCallState.current
+    prevCallState.current = callState
+    if (callState === "active" && prev !== "active") play("connected")
+    else if (callState === "idle" && prev === "active") play("ended")
+    if (callState !== "ringing") return
+    play("ring")
+    const timer = setInterval(() => play("ring"), 2500)
+    return () => clearInterval(timer)
+  }, [callState])
 
   // Initialize services
   useEffect(() => {
