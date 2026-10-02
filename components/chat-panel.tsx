@@ -71,6 +71,9 @@ export function ChatPanel({
   const { translationService } = useCall()
 
   useEffect(() => {
+    if (notice) play("error")
+  }, [notice])
+  useEffect(() => {
     translator.current = new FreeTranslationService()
   }, [])
 
@@ -147,7 +150,7 @@ export function ChatPanel({
           {readAloud ? <Volume2 className="h-4 w-4" aria-hidden /> : <VolumeX className="h-4 w-4" aria-hidden />}
           Read aloud: {readAloud ? "on" : "off"}
         </button>
-        <button onClick={onClose} className="kt-btn kt-btn-sm min-w-[44px] px-2" aria-label="Close chat">
+        <button onClick={onClose} data-sound="close" className="kt-btn kt-btn-sm min-w-[44px] px-2" aria-label="Close chat">
           <X className="h-4 w-4" aria-hidden />
         </button>
       </header>
@@ -213,7 +216,7 @@ export function ChatPanel({
             autoComplete="off"
             className="kt-field flex-1"
           />
-          <button type="submit" disabled={!draft.trim()} className="kt-btn kt-btn-primary">
+          <button type="submit" disabled={!draft.trim()} data-sound="none" className="kt-btn kt-btn-primary">
             <Send className="h-4 w-4" aria-hidden />
             Send
           </button>

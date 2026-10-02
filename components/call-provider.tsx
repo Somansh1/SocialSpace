@@ -122,6 +122,10 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
     return () => clearInterval(timer)
   }, [callState])
 
+  useEffect(() => {
+    if (callNotice) play("error")
+  }, [callNotice])
+
   // Initialize services
   useEffect(() => {
     speechRecognitionRef.current = new SpeechRecognitionService()

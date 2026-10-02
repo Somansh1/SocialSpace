@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { Link2, Shuffle, Check } from "lucide-react"
 import { Mark, TableScene } from "@/components/art"
+import { play } from "@/lib/sounds"
 import { buildInviteUrl, generateId, normalizeId, readInvite } from "@/lib/ids"
 
 export function EntryScreen({ onJoin }: { onJoin: (me: string, friend: string) => void }) {
@@ -25,6 +26,10 @@ export function EntryScreen({ onJoin }: { onJoin: (me: string, friend: string) =
       setFriend(generateId())
     }
   }, [])
+
+  useEffect(() => {
+    if (error) play("error")
+  }, [error])
 
   const myId = normalizeId(me)
   const friendId = normalizeId(friend)

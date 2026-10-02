@@ -127,7 +127,7 @@ export function Room({ me, friend, onLeave }: { me: string; friend: string; onLe
           <Mark className="h-9 w-9" />
           SocialSpace
         </h1>
-        <button onClick={leave} className="kt-btn kt-btn-sm ml-auto md:order-last">
+        <button onClick={leave} data-sound="close" className="kt-btn kt-btn-sm ml-auto md:order-last">
           <LogOut className="h-4 w-4" aria-hidden />
           Leave table
         </button>

@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react"
 import { ExternalLink, Maximize, Pause, Play, Volume2, VolumeX } from "lucide-react"
 import { useWebSocket } from "@/components/websocket-provider"
 import { safeHttpUrl } from "@/lib/safe-url"
+import { play } from "@/lib/sounds"
 
 interface SyncData {
   currentTime: number
@@ -121,6 +122,10 @@ export function WatchActivity({ me, friend, friendHere }: { me: string; friend: 
       v.removeEventListener("pause", onPause)
     }
   })
+
+  useEffect(() => {
+    if (notice) play("error")
+  }, [notice])
 
   const load = (e: React.FormEvent) => {
     e.preventDefault()

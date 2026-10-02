@@ -3,6 +3,7 @@
 import type React from "react"
 import { createContext, useContext, useState, useEffect, useRef } from "react"
 import { useToast } from "@/hooks/use-toast"
+import { play } from "@/lib/sounds"
 
 interface WebSocketContextType {
   ws: WebSocket | null
@@ -36,6 +37,16 @@ export function WebSocketProvider({ children, peerId }: WebSocketProviderProps) 
   const closedByUsRef = useRef(false)
   const messageHandlersRef = useRef<Set<(data: any) => void>>(new Set())
   const { toast } = useToast()
+
+  // one error sound per outage, not one per retry
+  const outageHeard = useRef(false)
+  useEffect(() => {
+    if (connectionState === "connected") outageHeard.current = false
+    else if (connectionState === "disconnected" && !outageHeard.current) {
+      outageHeard.current = true
+      play("error")
+    }
+  }, [connectionState])
 
   const connect = () => {
     if (socketRef.current?.readyState === WebSocket.OPEN) return
@@ -125,6 +136,7 @@ export function WebSocketProvider({ children, peerId }: WebSocketProviderProps) 
       ws.send(messageStr)
     } else {
       console.warn("WebSocket not connected, message not sent:", message)
+      play("error")
       toast({
         title: "Connection Error",
         description: "Message not sent - reconnecting...",

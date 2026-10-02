@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { Check, Eraser, ImageIcon, LinkIcon, Upload, Video as VideoIcon } from "lucide-react"
 import { useWebSocket } from "@/components/websocket-provider"
 import { safeHttpUrl, safeMediaSrc } from "@/lib/safe-url"
+import { play } from "@/lib/sounds"
 
 // Drawing runs on a fixed-size canvas, so both people share the same coordinate space whatever their screen size.
 // Points travel as 0..1 fractions (the existing "drawing-data" message, unchanged).
@@ -39,6 +40,10 @@ export function DrawActivity({ me, friend }: { me: string; friend: string }) {
   const [linkInput, setLinkInput] = useState("")
   const [notice, setNotice] = useState("")
   const [dims, setDims] = useState({ w: W, h: H })
+
+  useEffect(() => {
+    if (notice) play("error")
+  }, [notice])
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -114,6 +119,7 @@ export function DrawActivity({ me, friend }: { me: string; friend: string }) {
     e.currentTarget.setPointerCapture(e.pointerId)
     const p = point(e)
     drawing.current = true
+    play("pen")
     last.current = { x: p.x, y: p.y }
     line(p.x, p.y, p.x + 0.1, p.y + 0.1, colour, size)
     send(p.fx, p.fy, true)
@@ -132,6 +138,7 @@ export function DrawActivity({ me, friend }: { me: string; friend: string }) {
 
   const clearForBoth = () => {
     wipe()
+    play("clear")
     sendMessage({ type: "drawing-clear", targetId: friend, senderId: me })
   }
 
@@ -210,7 +217,7 @@ export function DrawActivity({ me, friend }: { me: string; friend: string }) {
           <input type="range" min={3} max={48} value={size} onChange={(e) => setSize(Number(e.target.value))} className="h-11 w-28 accent-ink" />
           <span className="w-8 tabular-nums text-mute">{size}</span>
         </label>
-        <button onClick={clearForBoth} className="kt-btn kt-btn-sm ml-auto" title="Wipes the paper for both of you">
+        <button onClick={clearForBoth} data-sound="none" className="kt-btn kt-btn-sm ml-auto" title="Wipes the paper for both of you">
           <Eraser className="h-4 w-4" aria-hidden />
           Clear for both
         </button>

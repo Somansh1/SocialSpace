@@ -37,11 +37,11 @@ export function IncomingCallBanner({ friend }: { friend: string }) {
         <p className="font-display text-xl font-semibold italic text-friend-ink">{friend} is calling</p>
       </div>
       <div className="flex gap-2">
-        <button onClick={acceptCall} className="kt-btn kt-btn-primary">
+        <button onClick={acceptCall} data-sound="none" className="kt-btn kt-btn-primary">
           <Phone className="h-4 w-4" aria-hidden />
           Accept
         </button>
-        <button onClick={rejectCall} className="kt-btn">
+        <button onClick={rejectCall} data-sound="close" className="kt-btn">
           Decline
         </button>
       </div>
@@ -69,7 +69,7 @@ export function CallStrip({ friend, onBack }: { friend: string; onBack: () => vo
             {isMuted ? "Unmute" : "Mute"}
           </button>
         )}
-        <button onClick={endCall} className="kt-btn kt-btn-sm kt-btn-danger">
+        <button onClick={endCall} data-sound="none" className="kt-btn kt-btn-sm kt-btn-danger">
           Hang up
         </button>
       </span>
@@ -164,7 +164,7 @@ export function CallPanel({
       {callNotice && (
         <div role="alert" className="kt-panel flex items-start gap-3 border-danger bg-surface p-3 text-danger" style={{ boxShadow: "4px 4px 0 #B3261E" }}>
           <p className="flex-1 font-semibold">{callNotice}</p>
-          <button onClick={clearCallNotice} className="kt-btn kt-btn-sm min-w-[44px] px-2" aria-label="Dismiss this message">
+          <button onClick={clearCallNotice} data-sound="close" className="kt-btn kt-btn-sm min-w-[44px] px-2" aria-label="Dismiss this message">
             <X className="h-4 w-4" aria-hidden />
           </button>
         </div>
@@ -229,7 +229,7 @@ export function CallPanel({
             <span className="font-semibold" role="status">
               Ringing {friend}...
             </span>
-            <button onClick={endCall} className="kt-btn ml-auto kt-btn-danger">
+            <button onClick={endCall} data-sound="close" className="kt-btn ml-auto kt-btn-danger">
               <PhoneOff className="h-4 w-4" aria-hidden />
               Cancel
             </button>
@@ -254,7 +254,7 @@ export function CallPanel({
               Chat
               {chatUnread > 0 && <span className="ml-1 rounded-full border-2 border-ink bg-mustard px-1.5 text-xs">{chatUnread} new</span>}
             </button>
-            <button onClick={endCall} className="kt-btn kt-btn-danger ml-auto">
+            <button onClick={endCall} data-sound="none" className="kt-btn kt-btn-danger ml-auto">
               <PhoneOff className="h-4 w-4" aria-hidden />
               Hang up
             </button>
