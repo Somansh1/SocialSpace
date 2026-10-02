@@ -99,6 +99,15 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
 
   const { sendMessage, connectionState, registerMessageHandler } = useWebSocket()
 
+  // Latest values for callbacks that outlive the render they were created in (the peer connection's
+  // onconnectionstatechange, and the unmount cleanup). Reading the state variables there sees the first render's values.
+  const peerConnectionRef = useRef<RTCPeerConnection | null>(null)
+  peerConnectionRef.current = peerConnection
+  const callStateRef = useRef(callState)
+  callStateRef.current = callState
+  const localStreamRef = useRef<MediaStream | null>(null)
+  localStreamRef.current = localStream
+
   // Initialize services
   useEffect(() => {
     speechRecognitionRef.current = new SpeechRecognitionService()
@@ -133,9 +142,7 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
   useEffect(() => {
     initializeLocalMedia()
     return () => {
-      if (localStream) {
-        localStream.getTracks().forEach((track) => track.stop())
-      }
+      localStreamRef.current?.getTracks().forEach((track) => track.stop())
     }
   }, [])
 
@@ -531,7 +538,7 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
 
   const endCall = () => {
     console.log("Ending call")
-    if (callState !== "idle") {
+    if (callStateRef.current !== "idle") {
       sendMessage({
         type: "call-ended",
         targetId,
@@ -544,8 +551,10 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
 
   const handleCallEnded = () => {
     console.log("Handling call ended")
-    if (peerConnection) {
-      peerConnection.close()
+    const pc = peerConnectionRef.current
+    if (pc) {
+      pc.close()
+      peerConnectionRef.current = null
       setPeerConnection(null)
     }
 

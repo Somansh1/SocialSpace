@@ -4,6 +4,7 @@ import type React from "react"
 import { useEffect, useRef, useState } from "react"
 import { ExternalLink, Maximize, Pause, Play, Volume2, VolumeX } from "lucide-react"
 import { useWebSocket } from "@/components/websocket-provider"
+import { safeHttpUrl } from "@/lib/safe-url"
 
 interface SyncData {
   currentTime: number
@@ -27,13 +28,13 @@ function embedUrl(url: string, name: string) {
   if (!m) return url
   switch (name) {
     case "YouTube":
-      return `https://www.youtube.com/embed/${m[1]}?enablejsapi=1&origin=${window.location.origin}`
+      return `https://www.youtube.com/embed/${encodeURIComponent(m[1])}?enablejsapi=1&origin=${window.location.origin}`
     case "Twitch":
-      return m[1] ? `https://player.twitch.tv/?video=${m[1]}&parent=${window.location.hostname}` : `https://player.twitch.tv/?channel=${m[2]}&parent=${window.location.hostname}`
+      return m[1] ? `https://player.twitch.tv/?video=${encodeURIComponent(m[1])}&parent=${window.location.hostname}` : `https://player.twitch.tv/?channel=${encodeURIComponent(m[2])}&parent=${window.location.hostname}`
     case "Vimeo":
-      return `https://player.vimeo.com/video/${m[1]}`
+      return `https://player.vimeo.com/video/${encodeURIComponent(m[1])}`
     case "Dailymotion":
-      return `https://www.dailymotion.com/embed/video/${m[1]}`
+      return `https://www.dailymotion.com/embed/video/${encodeURIComponent(m[1])}`
     default:
       return url
   }
@@ -71,8 +72,10 @@ export function WatchActivity({ me, friend, friendHere }: { me: string; friend: 
   useEffect(() => {
     return registerMessageHandler((data: any) => {
       if (data.type === "video-url") {
-        setVideoUrl(data.url)
-        setInput(data.url)
+        const url = safeHttpUrl(data.url) // untrusted: http(s) only
+        if (!url) return
+        setVideoUrl(url)
+        setInput(url)
         setIsHost(false)
         setNotice("")
       } else if (data.type === "video-sync" && !isHost) {
@@ -121,10 +124,9 @@ export function WatchActivity({ me, friend, friendHere }: { me: string; friend: 
 
   const load = (e: React.FormEvent) => {
     e.preventDefault()
-    const url = input.trim()
-    if (!url) return
-    const p = detect(url)
-    if (!p) {
+    const url = safeHttpUrl(input)
+    const p = url ? detect(url) : null
+    if (!url || !p) {
       setNotice("That address is not one we can play. Use a YouTube, Twitch, Vimeo or Dailymotion link, or a direct .mp4, .webm or .ogg file.")
       return
     }
@@ -235,7 +237,7 @@ export function WatchActivity({ me, friend, friendHere }: { me: string; friend: 
                 <Maximize className="h-4 w-4" aria-hidden />
                 Full screen
               </button>
-              <a href={videoUrl} target="_blank" rel="noopener noreferrer" className="kt-btn kt-btn-sm">
+              <a href={safeHttpUrl(videoUrl) ?? undefined} target="_blank" rel="noopener noreferrer" className="kt-btn kt-btn-sm">
                 <ExternalLink className="h-4 w-4" aria-hidden />
                 Open in a tab
               </a>

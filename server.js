@@ -2,7 +2,9 @@ const { WebSocketServer } = require("ws")
 
 // Hosting platforms hand the port in through PORT; locally it stays 8080.
 const PORT = Number(process.env.PORT) || 8080
-const wss = new WebSocketServer({ port: PORT })
+// maxPayload: pictures and videos shared in the draw activity travel as base64 data URLs, so allow 10 MiB.
+// Anything larger makes ws close that one connection (code 1009); the relay itself carries on.
+const wss = new WebSocketServer({ port: PORT, maxPayload: 10 * 1024 * 1024 })
 
 // A map to store connections, with the peerId as the key.
 const clients = new Map()
@@ -11,6 +13,15 @@ console.log(`Signaling server started on port ${PORT}...`)
 
 wss.on("connection", (ws) => {
   console.log("Client connected")
+
+  // Send ping every 30 seconds to keep connection alive
+  const pingInterval = setInterval(() => {
+    if (ws.readyState === ws.OPEN) {
+      ws.ping()
+    } else {
+      clearInterval(pingInterval)
+    }
+  }, 30000)
 
   ws.on("message", (message) => {
     let data
@@ -21,10 +32,28 @@ wss.on("connection", (ws) => {
       return
     }
 
+    // Valid JSON that is not an object (null, 5, "x", [..]) would crash the property reads below.
+    if (typeof data !== "object" || data === null || Array.isArray(data)) return
+
+    // Until a client has registered a usable ID it may only send "register".
+    if (!ws.peerId && data.type !== "register") return
+
     console.log("Received message:", data.type, "from:", data.senderId, "to:", data.targetId)
 
     // Handle user registration
-    if (data.type === "register" && data.id) {
+    if (data.type === "register") {
+      // Never register an empty / non-string / absurdly long ID. (No authentication: any client may claim any ID.)
+      if (typeof data.id !== "string" || !data.id.trim() || data.id.length > 64) return
+
+      // If this socket already held a different ID, release it (only if it is still ours).
+      if (ws.peerId && ws.peerId !== data.id && clients.get(ws.peerId) === ws) clients.delete(ws.peerId)
+
+      // Newest connection wins. The previous holder of this ID (typically a half-dead socket from before a quick
+      // reconnect) is detached, not closed: it stops receiving and its later close does nothing. Closing it would
+      // make a second open tab with the same name reconnect and steal the ID back in a loop.
+      const previous = clients.get(data.id)
+      if (previous && previous !== ws) previous.peerId = null
+
       clients.set(data.id, ws)
       console.log(`Registered client with ID: ${data.id}`)
       ws.peerId = data.id // Store the peerId on the WebSocket object itself
@@ -175,7 +204,10 @@ wss.on("connection", (ws) => {
   })
 
   ws.on("close", () => {
-    if (ws.peerId) {
+    clearInterval(pingInterval)
+    // peerId is null if this socket was replaced by a newer one with the same ID; then there is nothing to remove
+    // and the person is still here, so nobody is told they left.
+    if (ws.peerId && clients.get(ws.peerId) === ws) {
       clients.delete(ws.peerId)
       console.log(`Client ${ws.peerId} disconnected and removed.`)
 
@@ -191,7 +223,7 @@ wss.on("connection", (ws) => {
         }
       })
     } else {
-      console.log("An unregistered client disconnected.")
+      console.log("An unregistered or replaced client disconnected.")
     }
   })
 
@@ -199,14 +231,6 @@ wss.on("connection", (ws) => {
     console.error("WebSocket error:", error)
   })
 
-  // Send ping every 30 seconds to keep connection alive
-  const pingInterval = setInterval(() => {
-    if (ws.readyState === ws.OPEN) {
-      ws.ping()
-    } else {
-      clearInterval(pingInterval)
-    }
-  }, 30000)
 })
 
 // Handle server shutdown gracefully

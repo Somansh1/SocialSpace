@@ -9,7 +9,10 @@
     "build": "next build",
     "start": "next start",
     "relay": "node server.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check:relay": "node scripts/relay-check.js",
+    "check:url": "node --no-warnings scripts/url-check.mts",
+    "check": "npm run check:url && npm run check:relay"
   },
   "dependencies": {
     "@radix-ui/react-toast": "1.2.4",
