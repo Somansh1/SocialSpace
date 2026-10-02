@@ -326,7 +326,10 @@ export function CallProvider({ children, peerId, targetId }: CallProviderProps) 
     })
 
     return unregister
-  }, [registerMessageHandler, peerId, targetId])
+    // No dependency list on purpose: the handlers read peerConnection / localStream / ICE queue state, so they must be
+    // re-registered after every render. With the old deps they stayed frozen on the first render, which made the
+    // answerer build a second, track-less peer connection and the caller drop the answer.
+  })
 
   const createPeerConnection = () => {
     console.log("Creating peer connection...")
